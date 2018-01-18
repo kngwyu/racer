@@ -587,7 +587,7 @@ fn test_do_file_search() {
 
     let first_match = matches.next().unwrap();
 
-    assert!(first_match.filepath.ends_with("src/libstd/lib.rs"));
+    assert!(first_match.filepath.ends_with("src/libstd/lib.rs"), "first_match : {:?}", first_match);
 }
 
 pub fn do_file_search(
