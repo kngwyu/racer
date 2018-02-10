@@ -4212,3 +4212,20 @@ fn completes_methods_for_local_enum() {
     ";
     assert_eq!(get_only_completion(src, None).matchstr, "method");
 }
+
+// For issue 706
+#[test]
+fn completes_methods_based_on_trait_bounds() {
+    let _lock = sync!();
+    let src = "
+    fn main() {
+        trait Trait {
+            fn method(&self);
+        }
+        fn func<T: Trait>(arg: &T) {
+            arg.meth~
+        }
+    }
+    ";
+    assert_eq!(get_only_completion(src, None).matchstr, "method");
+}
