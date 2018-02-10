@@ -1271,8 +1271,8 @@ pub fn get_super_scope(filepath: &Path, pos: Point, session: &Session,
 pub fn resolve_path(path: &core::Path, filepath: &Path, pos: Point,
                     search_type: SearchType, namespace: Namespace,
                     session: &Session, pending_imports: &PendingImports) -> vec::IntoIter<Match> {
-    debug!("resolve_path {:?} {:?} {} {:?}", path, filepath.display(), pos, search_type);
     let len = path.segments.len();
+    debug!("resolve_path {:?}(len: {}) {:?} {} {:?}", path, len, filepath.display(), pos, search_type);
     if len == 1 {
         let pathseg = &path.segments[0];
         resolve_name(pathseg, filepath, pos, search_type, namespace, session, pending_imports)
