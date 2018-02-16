@@ -42,6 +42,8 @@ pub enum MatchType {
     Type,
     FnArg,
     Trait,
+    /// Generic Type with Trait Bound, like T: Iterator
+    TraitBound(Vec<Match>),
     Const,
     Static,
     Macro,

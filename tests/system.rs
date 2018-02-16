@@ -4222,7 +4222,7 @@ fn completes_methods_based_on_trait_bounds() {
         trait Trait {
             fn method(&self);
         }
-        fn func<T: Trait>(arg: &T) {
+        fn func<T: Trait>(self, arg: &T) {
             arg.meth~
         }
     }
