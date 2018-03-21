@@ -4227,3 +4227,33 @@ fn main {
         assert_eq!(doc_str, got.docs);
     })
 }
+// For issue 785
+#[test]
+fn completes_methods_for_global_enum() {
+    let _lock = sync!();
+    let src = r#"
+    fn main() {
+        let bar = Some("Hello");
+        bar.unwrap_or_def~
+    }
+    "#;
+    assert_eq!(get_only_completion(src, None).matchstr, "unwrap_or_default");
+}
+
+#[test]
+fn completes_methods_for_local_enum() {
+    let _lock = sync!();
+    let src = "
+    fn main() {
+        enum MyEnum {
+            A
+        }
+        impl MyEnum {
+            fn method(&self) {}
+        }
+        let bar = MyEnum::A;
+        bar.met~
+    }
+    ";
+    assert_eq!(get_only_completion(src, None).matchstr, "method");
+}
