@@ -4181,6 +4181,7 @@ fn completes_for_let_destracted_var_over_comment() {
     assert_eq!(get_only_completion(src, None).matchstr, "variable");
 }
 
+
 // For Issue #815
 #[test]
 fn completes_methods_after_raw_string() {
@@ -4193,4 +4194,36 @@ fn completes_methods_after_raw_string() {
     }
     "##;
     assert!(get_all_completions(src, None).iter().any(|ma| ma.matchstr == "len"));
+}
+
+// For issue 826
+#[test]
+fn find_crate_doc() {
+    let _lock = sync!();
+
+    let src = "
+    extern crate fixtures;
+    use fixtur~
+    ";
+    let doc_str =
+r#"This is a test project for racer.
+
+# Example:
+Basic Usage.
+
+```
+extern crate test_fixtures;
+use test_fixtures::foo;
+fn main {
+    println!("Racer")
+}
+```
+
+## Notes:
+- We should check racer can parse rust doc style comments
+- and some comments..."#;
+    within_test_project(|| {
+        let got = get_one_completion(src, None);
+        assert_eq!(doc_str, got.docs);
+    })
 }
