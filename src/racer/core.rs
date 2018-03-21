@@ -42,6 +42,7 @@ pub enum MatchType {
     Type,
     FnArg,
     Trait,
+    TraitBounds(ast::TraitBounds),
     Const,
     Static,
     Macro,
