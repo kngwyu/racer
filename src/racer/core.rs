@@ -1039,7 +1039,7 @@ fn complete_from_file_(
         },
         CompletionType::Field => {
             let context = ast::get_type_of(contextstr.to_owned(), filepath, pos, session);
-            debug!("complete_from_file context is {:?}", context);
+            println!("complete_from_file context is {:?}", context);
             context.map(|ty| {
                 complete_field_for_ty(ty, searchstr, SearchType::StartsWith, session, &mut out);
             });

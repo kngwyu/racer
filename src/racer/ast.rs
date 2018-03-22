@@ -9,7 +9,7 @@ use std::rc::Rc;
 use rustc_errors::Handler;
 use rustc_errors::emitter::ColorConfig;
 use syntax::ast::{self, ExprKind, FunctionRetTy, Generics, GenericParam, ItemKind, LitKind,
-                  PatKind, TyKind, TyParamBound, TyParamBounds, UseTreeKind};
+                  PatKind, TyKind, TyParamBound, TyParamBounds, UseTree, UseTreeKind};
 use syntax::{codemap, visit, self};
 use syntax::parse::parser::Parser;
 use syntax::parse::{self, ParseSess};
@@ -113,7 +113,34 @@ pub struct UseVisitor {
 }
 
 impl<'ast> visit::Visitor<'ast> for UseVisitor {
-    fn visit_item(&mut self, i: &ast::Item) {                       
+    fn visit_item(&mut self, i: &ast::Item) {
+        fn collect_nested_item(use_tree: &UseTree) -> Vec<PathWithAlias> {
+            let mut res = vec![];
+            let path = to_racer_path(&use_tree.prefix);
+            match use_tree.kind {
+                UseTreeKind::Simple(ident) => {
+                    if let Some(ident) = ident {
+                        res.push(PathWithAlias {
+                            ident: ident.name.to_string(),
+                            path: path,
+                        });
+                    }
+                }
+                UseTreeKind::Nested(ref nested) => {
+                    nested.iter().for_each(|(ref tree, _)| {
+                        res.extend(collect_nested_item(tree));
+                    });
+                }
+                UseTreeKind::Glob => {
+                    // TODO: add nested glob support
+                    // now we can write like
+                    // use std::collections::{hashmap::*, HashMap};
+                    // by https://github.com/rust-lang/rust/issues/44494
+                    // but, now ignore this..
+                }
+            }
+            res
+        }
         if let ItemKind::Use(ref use_tree) = i.node {
             let path = to_racer_path(&use_tree.prefix);
             match use_tree.kind {
@@ -126,20 +153,11 @@ impl<'ast> visit::Visitor<'ast> for UseVisitor {
                         self.ident = Some(ident.name.to_string());
                     }
                 },
-                UseTreeKind::Nested(ref nested_tree) => {
+                UseTreeKind::Nested(ref nested) => {
                     let basepath = path;
-                    // for path in paths {
-                        // Figure out the identifier being introduced to the local
-                        // namespace. This will differ from the import name if an `as`
-                        // was used.
-                    //     let ident = path.node.rename.unwrap_or(path.node.name).name.to_string();
-
-                    //     let name = path.node.name.name.to_string();
-
-                    //     let seg = core::PathSegment{ name: name, types: Vec::new() };
-                    //     let mut newpath = basepath.clone();
-
-                    //     newpath.segments.push(seg);
+                    nested.iter().for_each(|(ref tree, _)| {
+                        self.paths.extend(collect_nested_item(tree));           
+                    });
                     //     self.paths.push(PathWithAlias {
                     //         ident: ident,
                     //         path: newpath,
@@ -168,7 +186,6 @@ impl<'ast> visit::Visitor<'ast> for PatBindVisitor {
     fn visit_expr(&mut self, ex: &ast::Expr) {
         // don't visit the RHS or block of an 'if let' or 'for' stmt
         if let ExprKind::IfLet(ref pattern, _,_,_) = ex.node {
-            println!("{:?}", pattern);
             pattern.iter().for_each(|pat| self.visit_pat(pat));
         } else if let ExprKind::WhileLet(ref pattern, _,_,_) = ex.node {
             pattern.iter().for_each(|pat| self.visit_pat(pat));
@@ -362,6 +379,7 @@ impl<'c, 's, 'ast> visit::Visitor<'ast> for LetTypeVisitor<'c, 's> {
                                              session: self.session };
                 v.visit_expr(expr);
                 // TODO: too ugly
+                println!("pat: {:?} result: {:?} expr: {:?}", pattern, v.result, expr);
                 self.result = v
                     .result
                     .and_then(|ty|
@@ -576,7 +594,9 @@ impl<'c, 's, 'ast> visit::Visitor<'ast> for ExprTypeVisitor<'c, 's> {
                                  self.scope.point + lo as usize,
                                  self.session).and_then(|m| {
                                      let msrc = self.session.load_file_and_mask_comments(&m.filepath);
-                                     typeinf::get_type_of_match(m, msrc.as_src(), self.session)
+                                     let res = typeinf::get_type_of_match(m, msrc.as_src(), self.session);
+                                     println!("res: {:?}", res);
+                                     res
                                  });
             }
             ExprKind::Call(ref callee_expression, _/*ref arguments*/) => {
