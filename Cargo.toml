@@ -28,6 +28,9 @@ toml = "0.2.1"
 env_logger = "0.5"
 clap = "2.19"
 lazy_static = "1.0"
+rustc-ap-rustc_errors = "73.0.0"
+rustc-ap-syntax = "73.0.0"
+rustc-ap-syntax_pos = "73.0.0"
 
 [dependencies.clippy]
 version = "0.0.103"
