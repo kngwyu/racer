@@ -114,21 +114,22 @@ pub struct UseVisitor {
 
 impl<'ast> visit::Visitor<'ast> for UseVisitor {
     fn visit_item(&mut self, i: &ast::Item) {
-        fn collect_nested_item(use_tree: &UseTree) -> Vec<PathWithAlias> {
+        fn collect_nested_item(use_tree: &UseTree, parent_path: &core::Path) -> Vec<PathWithAlias> {
             let mut res = vec![];
-            let path = to_racer_path(&use_tree.prefix);
+            let mut path = parent_path.clone();
+            let current_path = to_racer_path(&use_tree.prefix);
+            path.extend(current_path);
             match use_tree.kind {
-                UseTreeKind::Simple(ident) => {
-                    if let Some(ident) = ident {
-                        res.push(PathWithAlias {
-                            ident: ident.name.to_string(),
-                            path: path,
-                        });
-                    }
+                UseTreeKind::Simple(_) => {
+                    let ident = use_tree.ident();
+                    res.push(PathWithAlias {
+                        ident: ident.name.to_string(),
+                        path: path,
+                    });
                 }
                 UseTreeKind::Nested(ref nested) => {
                     nested.iter().for_each(|(ref tree, _)| {
-                        res.extend(collect_nested_item(tree));
+                        res.extend(collect_nested_item(tree, &path));
                     });
                 }
                 UseTreeKind::Glob => {
@@ -144,25 +145,19 @@ impl<'ast> visit::Visitor<'ast> for UseVisitor {
         if let ItemKind::Use(ref use_tree) = i.node {
             let path = to_racer_path(&use_tree.prefix);
             match use_tree.kind {
-                UseTreeKind::Simple(ident) => {
-                    if let Some(ident) = ident {
-                        self.paths.push(PathWithAlias {
-                            ident: ident.name.to_string(),
-                            path: path,
-                        });
-                        self.ident = Some(ident.name.to_string());
-                    }
+                UseTreeKind::Simple(_) => {
+                    let ident = use_tree.ident().name.to_string();
+                    self.paths.push(PathWithAlias {
+                        ident: ident.clone(),
+                        path: path,
+                    });
+                    self.ident = Some(ident);
                 },
                 UseTreeKind::Nested(ref nested) => {
                     let basepath = path;
                     nested.iter().for_each(|(ref tree, _)| {
-                        self.paths.extend(collect_nested_item(tree));           
+                        self.paths.extend(collect_nested_item(tree, &basepath));           
                     });
-                    //     self.paths.push(PathWithAlias {
-                    //         ident: ident,
-                    //         path: newpath,
-                    //     });
-                    // }
                 }
                 UseTreeKind::Glob => {
                     self.paths.push(path.into());
@@ -379,7 +374,6 @@ impl<'c, 's, 'ast> visit::Visitor<'ast> for LetTypeVisitor<'c, 's> {
                                              session: self.session };
                 v.visit_expr(expr);
                 // TODO: too ugly
-                println!("pat: {:?} result: {:?} expr: {:?}", pattern, v.result, expr);
                 self.result = v
                     .result
                     .and_then(|ty|
@@ -594,9 +588,7 @@ impl<'c, 's, 'ast> visit::Visitor<'ast> for ExprTypeVisitor<'c, 's> {
                                  self.scope.point + lo as usize,
                                  self.session).and_then(|m| {
                                      let msrc = self.session.load_file_and_mask_comments(&m.filepath);
-                                     let res = typeinf::get_type_of_match(m, msrc.as_src(), self.session);
-                                     println!("res: {:?}", res);
-                                     res
+                                     typeinf::get_type_of_match(m, msrc.as_src(), self.session)
                                  });
             }
             ExprKind::Call(ref callee_expression, _/*ref arguments*/) => {

@@ -592,7 +592,6 @@ pub fn match_use(msrc: &str, blobstart: Point, blobend: Point,
     } else if txt_matches(search_type, searchstr, blob) {
         debug!("found use: {} in |{}|", searchstr, blob);
         let use_item = ast::parse_use(blob.to_owned());
-
         let ident = use_item.ident.unwrap_or("".into());
         for path in use_item.paths.into_iter() {
             let len = path.path.segments.len();

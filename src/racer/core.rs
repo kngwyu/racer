@@ -277,6 +277,11 @@ impl Path {
             .collect::<Vec<_>>();
         Path{ global: global, segments: segs }
     }
+
+    pub fn extend(&mut self, path: Path) -> &mut Self {
+        self.segments.extend(path.segments);
+        self
+    }
 }
 
 impl fmt::Debug for Path {
@@ -1039,7 +1044,7 @@ fn complete_from_file_(
         },
         CompletionType::Field => {
             let context = ast::get_type_of(contextstr.to_owned(), filepath, pos, session);
-            println!("complete_from_file context is {:?}", context);
+            debug!("complete_from_file context is {:?}", context);
             context.map(|ty| {
                 complete_field_for_ty(ty, searchstr, SearchType::StartsWith, session, &mut out);
             });
