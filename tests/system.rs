@@ -4262,6 +4262,7 @@ fn completes_methods_for_local_enum() {
 mod trait_bounds {
     use super::*;
     #[test]
+    #[ignore]
     fn completes_methods_for_fnarg_by_trait_bounds() {
         let _lock = sync!();
         let src = "
@@ -4278,6 +4279,7 @@ mod trait_bounds {
     }
 
     #[test]
+    #[ignore]
     fn completes_external_methods_for_fnarg_by_trait_bounds() {
         let _lock = sync!();
         let src = "
@@ -4291,6 +4293,7 @@ mod trait_bounds {
     }
 
     #[test]
+    #[ignore]
     fn completes_inherited_methods_for_fnarg_by_trait_bounds() {
         let _lock = sync!();
         let src = "
@@ -4311,6 +4314,7 @@ mod trait_bounds {
 
     // test for checking racer don't cause INF loop
     #[test]
+    #[ignore]
     fn completes_inherited_methods_with_cycle() {
         let _lock = sync!();
         let src = "
