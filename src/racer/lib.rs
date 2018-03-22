@@ -4,11 +4,16 @@
 #![cfg_attr(feature = "clippy", allow(clippy))]
 #![cfg_attr(all(feature = "clippy", not(test)), deny(print_stdout))]
 
-#[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
+#![feature(match_default_bindings, universal_impl_trait)]
 
-extern crate syntex_syntax;
-extern crate syntex_errors;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate lazy_static;
+
+extern crate rustc_errors;
+extern crate syntax;
+extern crate syntax_pos;
 extern crate toml;
 
 #[macro_use]
