@@ -8,4 +8,4 @@
 - [x] [#826](https://github.com/racer-rust/racer/issues/826)
 - [x] [#785](https://github.com/racer-rust/racer/issues/785)
 - [x] [#815](https://github.com/racer-rust/racer/issues/815)
-- [x] replace `syntex_syntax` to `rustc-ap-syntax`
+- [x] replace `syntex_syntax` with `rustc-ap-syntax`
