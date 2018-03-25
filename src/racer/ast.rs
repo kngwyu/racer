@@ -60,110 +60,95 @@ pub fn with_stmt(source_str: String, f: impl FnOnce(&ast::Stmt)) -> Option<()> {
     })
 }
 
-// parse a string, return a crate.
-pub fn string_to_crate(source_str: String) -> Option<ast::Crate> {
-    with_error_checking_parse(source_str.clone(), |p| {
-        use std::result::Result::{Ok, Err};
-        match p.parse_crate_mod() {
-            Ok(e) => Some(e),
-            Err(mut err) => {
-                err.cancel();
-                debug!("unable to parse crate. Returning None |{}|", source_str);
-                None
-            }
-        }
-    })
-}
-
 /// The leaf of a `use` statement. Extends `core::Path` to support
 /// aliases in `ViewPathList` scenarios.
 #[derive(Debug)]
-pub struct PathWithAlias {
-    /// The identifier introduced into the current scope.
-    pub ident: String,
+pub struct PathAlias {
+    /// the leaf of Use Tree
+    /// it can be one of one of 2 types, e.g.
+    /// use std::collections::{hashmap::*, HashMap};
+    pub kind: PathAliasKind,
     /// The path.
     pub path: core::Path,
 }
 
-impl From<core::Path> for PathWithAlias {
-    fn from(v: core::Path) -> Self {
-        PathWithAlias {
-            ident: v.segments[0].name.clone(),
-            path: v,
-        }
-    }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PathAliasKind {
+    Ident(String),
+    Self_(String),
+    Glob,
 }
 
-impl AsRef<core::Path> for PathWithAlias {
+impl AsRef<core::Path> for PathAlias {
     fn as_ref(&self) -> &core::Path {
         &self.path
     }
 }
 
+/// collect paths from syntax::ast::UseTree
 #[derive(Debug)]
 pub struct UseVisitor {
-    /// For a single `use` statement, contains the identifier introduced into the current
-    /// scope.
-    ///
-    /// * A simple use statement such as `use foo::bar` will set this to `"bar"`.
-    /// * An alias such as `use foo::bar as baz` will set this to `"baz"`.
-    pub ident : Option<String>,
-    pub paths : Vec<PathWithAlias>,
-    pub is_glob: bool
+    pub path_list : Vec<PathAlias>,
+    pub contains_glob: bool,
 }
 
 impl<'ast> visit::Visitor<'ast> for UseVisitor {
     fn visit_item(&mut self, i: &ast::Item) {
-        fn collect_nested_item(use_tree: &UseTree, parent_path: &core::Path) -> Vec<PathWithAlias> {
+        fn collect_nested_items(
+            use_tree: &UseTree,
+            parent_path: Option<&core::Path>
+        ) -> (Vec<PathAlias>, bool) {
             let mut res = vec![];
-            let mut path = parent_path.clone();
-            let current_path = to_racer_path(&use_tree.prefix);
-            path.extend(current_path);
-            match use_tree.kind {
-                UseTreeKind::Simple(_) => {
-                    let ident = use_tree.ident();
-                    res.push(PathWithAlias {
-                        ident: ident.name.to_string(),
-                        path: path,
-                    });
-                }
-                UseTreeKind::Nested(ref nested) => {
-                    nested.iter().for_each(|(ref tree, _)| {
-                        res.extend(collect_nested_item(tree, &path));
-                    });
-                }
-                UseTreeKind::Glob => {
-                    // TODO: add nested glob support
-                    // now we can write like
-                    // use std::collections::{hashmap::*, HashMap};
-                    // by https://github.com/rust-lang/rust/issues/44494
-                    // but, now ignore this..
-                }
-            }
-            res
-        }
-        if let ItemKind::Use(ref use_tree) = i.node {
-            let path = to_racer_path(&use_tree.prefix);
+            let mut path = if let Some(parent) = parent_path {
+                let relative_path = to_racer_path(&use_tree.prefix);
+                let mut path = parent.clone();
+                path.extend(relative_path);
+                path
+            } else {
+                to_racer_path(&use_tree.prefix)
+            };
+            let mut contains_glob = false;
             match use_tree.kind {
                 UseTreeKind::Simple(_) => {
                     let ident = use_tree.ident().name.to_string();
-                    self.paths.push(PathWithAlias {
-                        ident: ident.clone(),
+                    let kind = if let Some(last_seg) = path.segments.last() {
+                        if last_seg.name == "self" {
+                            PathAliasKind::Self_(ident)
+                        } else {
+                            PathAliasKind::Ident(ident)
+                        }
+                    } else {
+                        PathAliasKind::Ident(ident)
+                    };
+                    if let PathAliasKind::Self_(_) = kind {
+                        path.segments.pop();
+                    }
+                    res.push(PathAlias {
+                        kind: kind,
                         path: path,
                     });
-                    self.ident = Some(ident);
-                },
+                }
                 UseTreeKind::Nested(ref nested) => {
-                    let basepath = path;
                     nested.iter().for_each(|(ref tree, _)| {
-                        self.paths.extend(collect_nested_item(tree, &basepath));           
+                        let (items, has_glob) = collect_nested_items(tree, Some(&path));
+                        res.extend(items);
+                        contains_glob |= has_glob;
                     });
                 }
                 UseTreeKind::Glob => {
-                    self.paths.push(path.into());
-                    self.is_glob = true;
+                    res.push(PathAlias {
+                        kind: PathAliasKind::Glob,
+                        path: path,
+                    });
+                    contains_glob = true;
                 }
             }
+            (res, contains_glob)
+        }
+        if let ItemKind::Use(ref use_tree) = i.node {
+            let (path_list, contains_glob) = collect_nested_items(use_tree, None);
+            self.path_list = path_list;
+            self.contains_glob = contains_glob;
         }
     }
 }
@@ -1187,7 +1172,7 @@ impl<'ast> visit::Visitor<'ast> for EnumVisitor {
 }
 
 pub fn parse_use(s: String) -> UseVisitor {
-    let mut v = UseVisitor{ ident: None, paths: Vec::new(), is_glob: false };
+    let mut v = UseVisitor { path_list: Vec::new(), contains_glob: false };
     with_stmt(s, |stmt| visit::walk_stmt(&mut v, stmt));
     v
 }
@@ -1359,13 +1344,13 @@ pub struct FnArgTypeVisitor<'c: 's, 's> {
     session: &'s Session<'c>,
     /// the code point search string starts
     /// use i32 for the case `impl blah {` in inserted
-    offset: i32,
+    _offset: i32,
     pub result: Option<Ty>
 }
 
 
 impl<'c, 's, 'ast> visit::Visitor<'ast> for FnArgTypeVisitor<'c, 's> {
-    fn visit_fn(&mut self, fk: visit::FnKind, fd: &ast::FnDecl, _: codemap::Span, _: ast::NodeId) {
+    fn visit_fn(&mut self, _fk: visit::FnKind, fd: &ast::FnDecl, _: codemap::Span, _: ast::NodeId) {
         // Get generics arguments here (just for speed up)
         let filepath = &self.scope.filepath;
         // STUB(now FnArg has no genrics info so we have to rewrite this logic)
