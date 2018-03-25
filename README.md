@@ -10,7 +10,7 @@
 - [x] [#815](https://github.com/racer-rust/racer/issues/815)
 - [x] replace `syntex_syntax` with `rustc-ap-syntax`
 - [x] support [use_nested_groups](https://github.com/rust-lang/rust/issues/44494)
-- [] rewrite file cache using `cargo metadata`
-- [] get definition of macros in other crates
-- [] complete `try_trait` support
-- [] completion based on trait bound
+- [ ] rewrite file cache using `cargo metadata`
+- [ ] get definition of macros in other crates
+- [ ] complete `try_trait` support
+- [ ] completion based on trait bound
