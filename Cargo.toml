@@ -1,12 +1,12 @@
 [package]
 
-name = "racer"
-version = "2.0.13"
+name = "racer-nightly"
+version = "2.1.0"
 license = "MIT"
 description = "Code completion for Rust"
-authors = ["Phil Dawes <phil@phildawes.net>"]
-homepage = "https://github.com/racer-rust/racer"
-repository = "https://github.com/racer-rust/racer"
+authors = ["Phil Dawes <phil@phildawes.net>", "Yuji Kanagawa <yuji.kngw.80s.revive@gmail.com>"]
+homepage = "https://github.com/kngwyu/racer-nightly"
+repository = "https://github.com/kngwyu/racer-nightly"
 
 [lib]
 name = "racer"
