@@ -1344,7 +1344,7 @@ pub struct FnArgTypeVisitor<'c: 's, 's> {
     session: &'s Session<'c>,
     /// the code point search string starts
     /// use i32 for the case `impl blah {` in inserted
-    _offset: i32,
+    offset: i32,
     pub result: Option<Ty>
 }
 
