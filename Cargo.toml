@@ -22,23 +22,19 @@ debug = true
 
 [dependencies]
 log = "0.4"
-syntex_syntax = "0.52.0"
-syntex_errors = "0.52.0"
-toml = "0.2.1"
 env_logger = "0.5"
-clap = "2.19"
+clap = "2.31"
 lazy_static = "1.0"
 rustc-ap-rustc_errors = "73.0.0"
 rustc-ap-syntax = "73.0.0"
 rustc-ap-syntax_pos = "73.0.0"
+# it's too old, but we don't have to update it,
+# because it'll be not necessary after rewriting file cache
+toml = "0.2.1"
 
 [dependencies.clippy]
-version = "0.0.103"
+version = "0.0.189"
 optional = true
 
 [dev-dependencies]
 rand = "0.4"
-lazy_static = "1.0"
-
-[features]
-nightly = []
