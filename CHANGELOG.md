@@ -4,9 +4,14 @@ Change Log
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning](http://semver.org/).
 
-## HEAD
+## 2.1.0
+First release of nightly
+Actually I didn't release it in crates.io, but I just bumped the version, because so many changes have been done.
 
-No changes, yet!
+- support enum variant completion without type anotation
+- fixed the annoying bug around raw string
+- update from `syntax_syntax` to `rustc-ap-syntax`
+- support `use_nested_groups`
 
 ## 2.0.12
 
