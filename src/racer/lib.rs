@@ -4,8 +4,6 @@
 #![cfg_attr(feature = "clippy", allow(clippy))]
 #![cfg_attr(all(feature = "clippy", not(test)), deny(print_stdout))]
 
-#![feature(match_default_bindings, universal_impl_trait)]
-
 extern crate cargo;
 #[macro_use]
 extern crate log;
