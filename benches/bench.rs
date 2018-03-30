@@ -1,6 +1,6 @@
 #![feature(test)]
-extern crate test;
 extern crate racer;
+extern crate test;
 
 use racer::codecleaner::code_chunks;
 use racer::codeiter::iter_stmts;
@@ -15,13 +15,18 @@ use std::path::PathBuf;
 
 fn get_rust_file_str(path: &[&str]) -> String {
     let mut src_path = match var("RUST_SRC_PATH") {
-        Ok(env) => { PathBuf::from(&env) },
-        _ => panic!("Cannot find $RUST_SRC_PATH")
+        Ok(env) => PathBuf::from(&env),
+        _ => panic!("Cannot find $RUST_SRC_PATH"),
     };
-    for &s in path.iter() { src_path.push(s); }
+    for &s in path.iter() {
+        src_path.push(s);
+    }
 
     let mut s = String::new();
-    File::open(&src_path).unwrap().read_to_string(&mut s).unwrap();
+    File::open(&src_path)
+        .unwrap()
+        .read_to_string(&mut s)
+        .unwrap();
     s
 }
 
@@ -57,4 +62,3 @@ fn bench_mask_sub_scopes(b: &mut Bencher) {
         test::black_box(mask_sub_scopes(src));
     });
 }
-

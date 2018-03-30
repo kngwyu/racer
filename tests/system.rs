@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use tempfile::{Builder, NamedTempFile, TempDir};
 
-use racer::{complete_from_file, find_definition, Match, MatchType, Coordinate, Point};
+use racer::{complete_from_file, find_definition, Coordinate, Match, MatchType, Point};
 
 fn tmpname() -> String {
     let thread = thread::current();
@@ -19,7 +19,7 @@ fn tmpname() -> String {
 
 /// Utility wrapper for NamedTempfile
 struct TmpFile {
-    inner: NamedTempFile
+    inner: NamedTempFile,
 }
 
 impl TmpFile {
@@ -30,7 +30,9 @@ impl TmpFile {
             .rand_bytes(0)
             .tempfile()
             .expect("failed to create tempfile.");
-        file.as_file_mut().write_all(src.as_bytes()).expect("couldn't write to temp file");
+        file.as_file_mut()
+            .write_all(src.as_bytes())
+            .expect("couldn't write to temp file");
         TmpFile { inner: file }
     }
     fn path(&self) -> &Path {
@@ -72,10 +74,10 @@ impl TmpDir {
             TmpDir::Real(new_path)
         } else {
             let dir = Builder::new()
-            .prefix(&dir_name)
-            .rand_bytes(0)
-            .tempdir_in(path)
-            .expect("failed to create nested tempdir.");
+                .prefix(&dir_name)
+                .rand_bytes(0)
+                .tempdir_in(path)
+                .expect("failed to create nested tempdir.");
             TmpDir::Tmp(dir)
         }
     }
@@ -86,7 +88,9 @@ impl TmpDir {
             .rand_bytes(0)
             .tempfile_in(path)
             .expect("failed to create nested tempfile.");
-        file.as_file_mut().write_all(src.as_bytes()).expect("couldn't write to temp file");
+        file.as_file_mut()
+            .write_all(src.as_bytes())
+            .expect("couldn't write to temp file");
         TmpFile { inner: file }
     }
     fn path(&self) -> &Path {
@@ -120,8 +124,7 @@ fn setup_test_project() -> TmpDir {
         for entry in fs::read_dir(abs_path)? {
             let entry = entry?;
             let path = entry.path();
-            let relative = path
-                .strip_prefix(abs_path)
+            let relative = path.strip_prefix(abs_path)
                 .expect("[setup_test_project] failed to strip_prefix(bug)");
             let relative = relative
                 .to_str()
@@ -189,7 +192,6 @@ fn get_definition(src: &str, dir: Option<TmpDir>) -> Match {
     find_definition(&path, completion_point, &session).unwrap()
 }
 
-
 #[test]
 fn completes_fn() {
     let src = "
@@ -203,7 +205,6 @@ fn completes_fn() {
     let got = get_one_completion(src, None);
     assert_eq!("apple", got.matchstr);
 }
-
 
 #[test]
 fn finds_fn_docs() {
@@ -293,8 +294,13 @@ fn completes_fn_with_substitute_file() {
     let real_file = Path::new("not_real.rs");
     let session = racer::Session::new(&cache);
     session.cache_file_contents(&real_file, src);
-    let cursor = Coordinate { line: 6, column: 18 };
-    let got = complete_from_file(real_file, cursor, &session).nth(0).unwrap();
+    let cursor = Coordinate {
+        line: 6,
+        column: 18,
+    };
+    let got = complete_from_file(real_file, cursor, &session)
+        .nth(0)
+        .unwrap();
 
     assert_eq!(Some(Coordinate { line: 2, column: 8 }), got.coords);
     assert_eq!("apple", got.matchstr);
@@ -470,11 +476,17 @@ fn completes_for_vec_field_and_method() {
     let path = dir.write_file("src.rs", src);
     let cache = racer::FileCache::default();
     let session = racer::Session::new(&cache);
-    let cursor1 = Coordinate { line: 22, column: 18 };
+    let cursor1 = Coordinate {
+        line: 22,
+        column: 18,
+    };
     let got1 = complete_from_file(&path, cursor1, &session).nth(0).unwrap();
     println!("{:?}", got1);
     assert_eq!("stfield", got1.matchstr);
-    let cursor2 = Coordinate { line: 23, column: 18 };
+    let cursor2 = Coordinate {
+        line: 23,
+        column: 18,
+    };
     let got2 = complete_from_file(&path, cursor2, &session).nth(0).unwrap();
     println!("{:?}", got2);
     assert_eq!("stmethod", got2.matchstr);
@@ -507,12 +519,22 @@ fn completes_trait_methods() {
     let path = f.path();
     let cache1 = racer::FileCache::default();
     let session1 = racer::Session::new(&cache1);
-    let cursor1 = Coordinate { line: 18, column: 18};
-    let got1 = complete_from_file(&path, cursor1, &session1).nth(0).unwrap();
+    let cursor1 = Coordinate {
+        line: 18,
+        column: 18,
+    };
+    let got1 = complete_from_file(&path, cursor1, &session1)
+        .nth(0)
+        .unwrap();
     let cache2 = racer::FileCache::default();
     let session2 = racer::Session::new(&cache2);
-    let cursor2 = Coordinate { line: 19, column: 11};
-    let got2 = complete_from_file(&path, cursor2, &session2).nth(0).unwrap();
+    let cursor2 = Coordinate {
+        line: 19,
+        column: 11,
+    };
+    let got2 = complete_from_file(&path, cursor2, &session2)
+        .nth(0)
+        .unwrap();
     println!("{:?}", got1);
     println!("{:?}", got2);
     assert_eq!(got1.matchstr, "traitf");
@@ -549,12 +571,22 @@ fn completes_trait_bounded_methods() {
     let path = f.path();
     let cache1 = racer::FileCache::default();
     let session1 = racer::Session::new(&cache1);
-    let cursor1 = Coordinate { line: 20, column: 16 };
-    let got1 = complete_from_file(&path, cursor1, &session1).nth(0).unwrap();
+    let cursor1 = Coordinate {
+        line: 20,
+        column: 16,
+    };
+    let got1 = complete_from_file(&path, cursor1, &session1)
+        .nth(0)
+        .unwrap();
     let cache2 = racer::FileCache::default();
     let session2 = racer::Session::new(&cache2);
-    let cursor2 = Coordinate { line: 21, column: 12 };
-    let got2 = complete_from_file(&path, cursor2, &session2).nth(0).unwrap();
+    let cursor2 = Coordinate {
+        line: 21,
+        column: 12,
+    };
+    let got2 = complete_from_file(&path, cursor2, &session2)
+        .nth(0)
+        .unwrap();
     println!("{:?}", got1);
     println!("{:?}", got2);
     assert_eq!(got1.matchstr, "traitf");
@@ -564,7 +596,7 @@ fn completes_trait_bounded_methods() {
 }
 
 #[test]
-fn completes_trait_bounded_methods_generic_return() { 
+fn completes_trait_bounded_methods_generic_return() {
     let src = "
     pub trait Trait1 {
         fn traitfn(&self) -> u32 { 2 }
@@ -596,8 +628,14 @@ fn completes_trait_bounded_methods_generic_return() {
     let path = f.path();
     let cache = racer::FileCache::default();
     let session = racer::Session::new(&cache);
-    let cursor1 = Coordinate { line: 24, column: 24 };
-    let cursor2 = Coordinate { line: 25, column: 25 };
+    let cursor1 = Coordinate {
+        line: 24,
+        column: 24,
+    };
+    let cursor2 = Coordinate {
+        line: 25,
+        column: 25,
+    };
     let got1 = complete_from_file(&path, cursor1, &session).nth(0).unwrap();
     let got2 = complete_from_file(&path, cursor2, &session).nth(0).unwrap();
     println!("{:?}", got1);
@@ -769,11 +807,17 @@ fn completes_for_vec_iter_field_and_method() {
     let path = dir.write_file("src.rs", src);
     let cache = racer::FileCache::default();
     let session = racer::Session::new(&cache);
-    let cursor1 = Coordinate { line: 22, column: 18 };
+    let cursor1 = Coordinate {
+        line: 22,
+        column: 18,
+    };
     let got1 = complete_from_file(&path, cursor1, &session).nth(0).unwrap();
     println!("{:?}", got1);
     assert_eq!("stfield", got1.matchstr);
-    let cursor2 = Coordinate { line: 23, column: 18 };
+    let cursor2 = Coordinate {
+        line: 23,
+        column: 18,
+    };
     let got2 = complete_from_file(&path, cursor2, &session).nth(0).unwrap();
     println!("{:?}", got2);
     assert_eq!("stmethod", got2.matchstr);
@@ -807,9 +851,15 @@ fn completes_trait_methods_when_at_scope_end() {
     let path = f.path();
     let cache = racer::FileCache::default();
     let session = racer::Session::new(&cache);
-    let cursor1 = Coordinate { line: 18, column: 18 };
+    let cursor1 = Coordinate {
+        line: 18,
+        column: 18,
+    };
     let got1 = complete_from_file(&path, cursor1, &session).nth(0).unwrap();
-    let cursor2 = Coordinate { line: 19, column: 11 };
+    let cursor2 = Coordinate {
+        line: 19,
+        column: 11,
+    };
     let got2 = complete_from_file(&path, cursor2, &session).nth(0).unwrap();
     println!("{:?}", got1);
     println!("{:?}", got2);
@@ -838,7 +888,6 @@ fn completes_for_type_alias() {
         foo().~
     }
     ";
-
 
     assert_eq!(get_all_completions(src, None)[0].matchstr, "method");
 }
@@ -959,7 +1008,7 @@ fn follows_multiple_use_globs() {
     let src2 = "
     pub fn src2fn() {}
     ";
-    let src ="
+    let src = "
     use multiple_glob_test1::*;
     use multiple_glob_test2::*;
     mod multiple_glob_test1;
@@ -976,8 +1025,12 @@ fn follows_multiple_use_globs() {
     let mut has_2 = false;
     let completions = get_all_completions(src, Some(dir));
     for m in completions {
-        if m.matchstr == "src1fn" { has_1 = true; }
-        if m.matchstr == "src2fn" { has_2 = true; }
+        if m.matchstr == "src1fn" {
+            has_1 = true;
+        }
+        if m.matchstr == "src2fn" {
+            has_2 = true;
+        }
     }
     assert!(has_1 && has_2);
 }
@@ -1004,12 +1057,18 @@ fn single_import_shadows_glob_import() {
     assert_eq!(got.matchstr, "Foo");
     println!("{}", got.filepath.display());
     println!("{}", got.point);
-    assert_eq!(got.coords, Some(Coordinate { line: 10, column: 19 }));
+    assert_eq!(
+        got.coords,
+        Some(Coordinate {
+            line: 10,
+            column: 19
+        })
+    );
 }
 
 #[test]
 fn follows_use_self() {
-    let src ="
+    let src = "
     use foo::use_self_test::{self, bar};
 
     mod foo {
@@ -1022,9 +1081,13 @@ fn follows_use_self() {
     ";
 
     let completions = get_all_completions(src, None);
-    assert!(completions.into_iter().any(|m| m.matchstr == "use_self_test"));
+    assert!(
+        completions
+            .into_iter()
+            .any(|m| m.matchstr == "use_self_test")
+    );
 
-    let src ="
+    let src = "
     use use_self_test::self;
 
     mod use_self_test {
@@ -1034,7 +1097,11 @@ fn follows_use_self() {
     ";
 
     let completions = get_all_completions(src, None);
-    assert!(completions.into_iter().any(|m| m.matchstr == "use_self_test"));
+    assert!(
+        completions
+            .into_iter()
+            .any(|m| m.matchstr == "use_self_test")
+    );
 }
 
 /// This test addresses https://github.com/racer-rust/racer/issues/645 by
@@ -1246,7 +1313,10 @@ fn keeps_newlines_in_external_mod_doc() {
     let _external_mod = dir.write_file("external_mod.rs", src1);
     let got = get_one_completion(src, Some(dir));
     assert_eq!("external_mod", got.matchstr);
-    assert_eq!("The mods multiline documentation\n\nwith an empty line", got.docs);
+    assert_eq!(
+        "The mods multiline documentation\n\nwith an empty line",
+        got.docs
+    );
 }
 
 /// Addresses https://github.com/racer-rust/racer/issues/618
@@ -1401,7 +1471,7 @@ fn struct_field_scalar_primitive_types() {
             "reference" => "&u8",
             "array" => "[u8; 5]",
             "slice" => "&[u8]",
-            _ => panic!("unexpected match from Foo struct ({})", completion.matchstr)
+            _ => panic!("unexpected match from Foo struct ({})", completion.matchstr),
         };
 
         assert_eq!(completion.contextstr, expected);
@@ -1624,16 +1694,16 @@ fn follows_use_nested_from_std() {
     let got = get_definition(src, None);
     assert_eq!(got.matchstr, "new");
 
-//     let src = r"
-//     use std::collections::{hash_map::*, HashMap};
-//     fn main() {
-//          let h = HashMap::new();
-//          let a = DefaultHasher::ne~w();
-//     }
-//     ";
+    //     let src = r"
+    //     use std::collections::{hash_map::*, HashMap};
+    //     fn main() {
+    //          let h = HashMap::new();
+    //          let a = DefaultHasher::ne~w();
+    //     }
+    //     ";
 
-//     let got = get_definition(src, None);
-//     assert_eq!(got.matchstr, "new");
+    //     let got = get_definition(src, None);
+    //     assert_eq!(got.matchstr, "new");
 }
 
 #[test]
@@ -2659,7 +2729,6 @@ fn completes_multiple_use_newline() {
     assert_eq!(got[0].matchstr, "myfn");
 }
 
-
 #[test]
 fn completes_trait_methods_in_trait_impl() {
     let src = "
@@ -3251,14 +3320,17 @@ x: i32
 
     let got = get_definition(src, None);
     assert_eq!("x", got.matchstr);
-    assert_eq!("|
+    assert_eq!(
+        "|
 
 
 x: i32
 
 
 
-|", got.contextstr);
+|",
+        got.contextstr
+    );
 }
 
 #[test]
@@ -3279,14 +3351,17 @@ x: i32
 
     let got = get_definition(src, None);
     assert_eq!("x", got.matchstr);
-    assert_eq!("|
+    assert_eq!(
+        "|
 
 
 x: i32
 
 
 
-|", got.contextstr);
+|",
+        got.contextstr
+    );
 }
 
 #[test]
@@ -3374,7 +3449,7 @@ fn closure_dont_detect_normal_pipes() {
 
 #[test]
 fn closure_test_curly_brackets_in_args() {
-    let src ="
+    let src = "
     struct Foo {
         bar: u16
     }
@@ -3395,7 +3470,7 @@ fn closure_test_curly_brackets_in_args() {
 
 #[test]
 fn closure_test_multiple_curly_brackets_in_args() {
-    let src ="
+    let src = "
     struct Foo {
         bar: u16
     }
@@ -3413,7 +3488,6 @@ fn closure_test_multiple_curly_brackets_in_args() {
     assert_eq!("bar", got.matchstr);
     assert_eq!("|Foo { bar }, Foo { ex }, Foo { b }|", got.contextstr);
 }
-
 
 #[test]
 fn literal_string_method() {
@@ -3626,7 +3700,7 @@ fn crate_restricted_impl_method_completes() {
 ///   |
 /// 1 | pub(in codegen) struct Foo {
 ///   |     ^^
-/// 
+///
 /// error: expected one of `)` or `::`, found `codegen`
 ///  --> bogofile:1:8
 ///   |
@@ -3886,7 +3960,11 @@ fn completes_methods_after_raw_string() {
         v.l~
     }
     "##;
-    assert!(get_all_completions(src, None).iter().any(|ma| ma.matchstr == "len"));
+    assert!(
+        get_all_completions(src, None)
+            .iter()
+            .any(|ma| ma.matchstr == "len")
+    );
 }
 
 // For issue 826
@@ -3896,8 +3974,7 @@ fn find_crate_doc() {
     extern crate fixtures;
     use fixtur~
     ";
-    let doc_str =
-r#"This is a test project for racer.
+    let doc_str = r#"This is a test project for racer.
 
 # Example:
 Basic Usage.
@@ -3977,7 +4054,11 @@ mod trait_bounds {
             }
         }
         ";
-        assert!(get_all_completions(src, None).into_iter().any(|ma| ma.matchstr == "clone"));
+        assert!(
+            get_all_completions(src, None)
+                .into_iter()
+                .any(|ma| ma.matchstr == "clone")
+        );
     }
 
     #[test]

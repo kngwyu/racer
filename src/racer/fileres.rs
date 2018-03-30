@@ -1,11 +1,10 @@
 use std::path::{Path, PathBuf};
-use cargo::{Config, core::{Workspace, TargetKind}};
+use cargo::{Config, core::{TargetKind, Workspace}};
 use cargo::ops::{resolve_ws_precisely, Packages};
 use cargo::util::important_paths::find_project_manifest;
 
 use core::Session;
 use nameres::RUST_SRC_PATH;
-
 
 /// get crate file from current path & crate name
 pub fn get_crate_file(name: &str, from_path: &Path, session: &Session) -> Option<PathBuf> {
@@ -57,7 +56,7 @@ pub fn get_module_file(name: &str, parentdir: &Path, session: &Session) -> Optio
 /// try to get outer crates
 fn get_outer_crates(libname: &str, from_path: &Path) -> Option<PathBuf> {
     macro_rules! unwrap_cargo_res {
-        ($r:expr) => {
+        ($r: expr) => {
             match $r {
                 Ok(val) => val,
                 Err(err) => {
@@ -65,9 +64,12 @@ fn get_outer_crates(libname: &str, from_path: &Path) -> Option<PathBuf> {
                     return None;
                 }
             }
-        }
+        };
     }
-    debug!("[get_outer_crates] lib name: {:?}, from_path: {:?}", libname, from_path);
+    debug!(
+        "[get_outer_crates] lib name: {:?}, from_path: {:?}",
+        libname, from_path
+    );
     let manifest = unwrap_cargo_res!(find_project_manifest(from_path, "Cargo.toml"));
     let libname_tmp = libname.to_owned();
     let name_slice = &[libname_tmp];
@@ -75,8 +77,8 @@ fn get_outer_crates(libname: &str, from_path: &Path) -> Option<PathBuf> {
     let ws = unwrap_cargo_res!(Workspace::new(&manifest, &config));
     // TODO: is is really collect? (or is Packages::All needed?)
     let specs = unwrap_cargo_res!(Packages::Packages(name_slice).into_package_id_specs(&ws));
-    let (packages, _)
-        = unwrap_cargo_res!(resolve_ws_precisely(&ws, None, &[], false, false, &specs));
+    let (packages, _) =
+        unwrap_cargo_res!(resolve_ws_precisely(&ws, None, &[], false, false, &specs));
     let libname_hyphened = {
         let tmp_str = libname.to_owned();
         tmp_str.replace("_", "-")
@@ -85,14 +87,14 @@ fn get_outer_crates(libname: &str, from_path: &Path) -> Option<PathBuf> {
     for package_id in packages.package_ids() {
         let package = unwrap_cargo_res!(packages.get(package_id));
         let targets = package.manifest().targets();
-        let lib_target = targets
-            .into_iter()
-            .find(|target| if let TargetKind::Lib(_) = target.kind() {
+        let lib_target = targets.into_iter().find(|target| {
+            if let TargetKind::Lib(_) = target.kind() {
                 let name = target.name();
                 name == libname || name == libname_hyphened
             } else {
                 false
-            });
+            }
+        });
         if let Some(target) = lib_target {
             return Some(target.src_path().to_owned());
         }
