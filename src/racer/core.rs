@@ -1,22 +1,22 @@
-use std::fs::File;
-use std::io::Read;
-use std::{fmt, vec};
-use std::{path, str};
-use std::io;
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::ops::Deref;
-use std::slice;
-use std::cmp::{max, min};
-use std::iter::{Fuse, Iterator};
-use std::rc::Rc;
 use codeiter::StmtIndicesIter;
 use matchers::PendingImports;
+use std::cell::RefCell;
+use std::cmp::{max, min};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io;
+use std::io::Read;
+use std::iter::{Fuse, Iterator};
+use std::ops::Deref;
+use std::rc::Rc;
+use std::slice;
+use std::{fmt, vec};
+use std::{path, str};
 
-use scopes;
-use nameres;
 use ast;
 use codecleaner;
+use nameres;
+use scopes;
 use util;
 
 /// Within a [`Match`], specifies what was matched
@@ -80,7 +80,6 @@ pub type SourceByteRange = (Point, Point);
 pub struct Coordinate {
     /// Line number, 1 based
     pub line: usize,
-
     /// Column number - 1 based
     pub column: usize,
 }
@@ -1040,7 +1039,7 @@ fn complete_from_file_(filepath: &path::Path, cursor: Location, session: &Sessio
             } else {
                 expr
             }).split("::")
-                .collect::<Vec<_>>();
+            .collect::<Vec<_>>();
 
             let path = Path::from_vec(is_global, v);
             for m in nameres::resolve_path(
@@ -1225,7 +1224,7 @@ pub fn find_definition_(
                         SearchType::ExactMatch,
                         session,
                     ).filter(|m| m.mtype == match_type)
-                        .nth(0)
+                    .nth(0)
                 } else {
                     None
                 }
@@ -1236,9 +1235,9 @@ pub fn find_definition_(
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
     use super::FileCache;
     use super::{Session, SessionExt};
+    use std::path::Path;
 
     #[test]
     fn overwriting_cached_files() {
@@ -1254,7 +1253,7 @@ mod tests {
         // Cache contents for a file and assert that load_file and load_file_and_mask_comments return
         // the newly cached contents.
         macro_rules! cache_and_assert {
-            ($src: ident) => {{
+            ($src:ident) => {{
                 let session = Session::new(&cache);
                 session.cache_file_contents(path, $src);
                 assert_eq!($src, &session.load_file(path).code[..]);

@@ -17,9 +17,6 @@ name = "racer"
 path = "src/bin/main.rs"
 doc = false
 
-[profile.release]
-debug = true
-
 [dependencies]
 log = "0.4"
 env_logger = "0.5"
