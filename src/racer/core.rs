@@ -10,6 +10,7 @@ use std::iter::{Fuse, Iterator};
 use std::ops::Deref;
 use std::rc::Rc;
 use std::slice;
+use std::time::SystemTime;
 use std::{fmt, vec};
 use std::{path, str};
 
@@ -634,12 +635,17 @@ pub struct FileCache {
 pub trait FileLoader {
     /// Load a single file
     fn load_file(&self, path: &path::Path) -> io::Result<String>;
+    /// last modified time of the file
+    fn modified(&self, path: &path::Path) -> io::Result<SystemTime>;
 }
 
 /// Provide a blanket impl for Arc<T> since Rls uses that
 impl<T: FileLoader> FileLoader for ::std::sync::Arc<T> {
     fn load_file(&self, path: &path::Path) -> io::Result<String> {
         (&self as &T).load_file(path)
+    }
+    fn modified(&self, path: &path::Path) -> io::Result<SystemTime> {
+        (&self as &T).modified(path)
     }
 }
 
@@ -662,6 +668,10 @@ impl FileLoader for DefaultFileLoader {
         } else {
             String::from_utf8(rawbytes).map_err(|err| io::Error::new(io::ErrorKind::Other, err))
         }
+    }
+    fn modified(&self, path: &path::Path) -> io::Result<SystemTime> {
+        let f = File::open(path)?;
+        f.metadata()?.modified()
     }
 }
 
