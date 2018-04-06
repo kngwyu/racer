@@ -626,6 +626,25 @@ pub struct FileCache {
 
     /// The file loader
     loader: Box<FileLoader>,
+
+    /// Metadata cahce
+    deps_map: RefCell<HashMap<path::PathBuf, Rc<DepsInfo>>>,
+}
+
+/// dependencies info of a package
+#[derive(Clone, Debug)]
+pub struct DepsInfo {
+    /// dependencies of package
+    deps: HashMap<String, path::PathBuf>,
+    /// last modified time
+    modified: SystemTime,
+}
+
+impl DepsInfo {
+    pub fn get(&self, query: &str) -> Option<path::PathBuf> {
+        let p = self.deps.get(query)?;
+        Some(p.to_owned())
+    }
 }
 
 /// Used by the FileCache for loading files
@@ -693,6 +712,7 @@ impl FileCache {
             raw_map: RefCell::new(HashMap::new()),
             masked_map: RefCell::new(HashMap::new()),
             loader: Box::new(loader),
+            deps_map: RefCell::new(HashMap::new()),
         }
     }
 
@@ -751,6 +771,10 @@ impl FileCache {
             .borrow_mut()
             .insert(filepath.to_path_buf(), msrc.clone());
         msrc
+    }
+
+    fn cache_deps(&self, manifest: path::PathBuf, deps: DepsInfo) {
+        self.deps_map.borrow_mut().insert(manifest, Rc::new(deps));
     }
 }
 
@@ -829,6 +853,42 @@ impl<'c> Session<'c> {
         let raw = self.cache.raw_map.borrow();
         let masked = self.cache.masked_map.borrow();
         raw.contains_key(path) && masked.contains_key(path)
+    }
+
+    pub fn deps<P: AsRef<path::Path>>(&self, manifest: P) -> Option<Rc<DepsInfo>> {
+        let manifest = manifest.as_ref();
+        let deps = self.cache.deps_map.borrow();
+        if let Some(dep) = deps.get(manifest) {
+            let modified = dep.modified;
+            let modified_correct = self.cache
+                .loader
+                .modified(manifest)
+                .unwrap_or(SystemTime::now());
+            if modified_correct > modified {
+                None
+            } else {
+                Some(Rc::clone(dep))
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn cache_deps<P: AsRef<path::Path>>(
+        &self,
+        manifest: P,
+        map: HashMap<String, path::PathBuf>,
+    ) {
+        let manifest = manifest.as_ref();
+        let modified = self.cache
+            .loader
+            .modified(manifest)
+            .unwrap_or(SystemTime::now());
+        let deps = DepsInfo {
+            deps: map,
+            modified: modified,
+        };
+        self.cache.cache_deps(manifest.to_owned(), deps);
     }
 }
 
@@ -1049,7 +1109,7 @@ fn complete_from_file_(filepath: &path::Path, cursor: Location, session: &Sessio
             } else {
                 expr
             }).split("::")
-            .collect::<Vec<_>>();
+                .collect::<Vec<_>>();
 
             let path = Path::from_vec(is_global, v);
             for m in nameres::resolve_path(
@@ -1234,7 +1294,7 @@ pub fn find_definition_(
                         SearchType::ExactMatch,
                         session,
                     ).filter(|m| m.mtype == match_type)
-                    .nth(0)
+                        .nth(0)
                 } else {
                     None
                 }
