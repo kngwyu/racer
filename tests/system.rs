@@ -1380,6 +1380,20 @@ fn follows_use_local_package_hyphend() {
     assert_eq!(got.matchstr, "useless_func");
 }
 
+// test for re-export
+#[test]
+fn follows_use_reexport() {
+    let src = "
+    extern crate fixtures;
+
+    use fixtures::use~;
+    ";
+    let dir = setup_test_project();
+    let srcdir = dir.nested_dir("src");
+    let got = get_only_completion(src, Some(srcdir));
+    assert_eq!(got.matchstr, "useless_func");
+}
+
 #[test]
 fn completes_struct_field_via_assignment() {
     let src = "

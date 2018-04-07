@@ -4,6 +4,11 @@ Change Log
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning](http://semver.org/).
 
+## 2.1.1
+replace current cargo.rs with `cargo` crate and add dependencies cache.
+
+For details, see [#3](https://github.com/kngwyu/racer-nightly/pull/3) and [#4](https://github.com/kngwyu/racer-nightly/pull/4).
+
 ## 2.1.0
 First release of nightly
 Actually I didn't release it in crates.io, but I just bumped the version, because so many changes have been done.

@@ -627,21 +627,21 @@ pub struct FileCache {
     /// The file loader
     loader: Box<FileLoader>,
 
-    /// Metadata cahce
+    /// cahced dependencies(manifest_path -> DepsInfo)
     deps_map: RefCell<HashMap<path::PathBuf, Rc<DepsInfo>>>,
 }
 
 /// dependencies info of a package
 #[derive(Clone, Debug)]
 pub struct DepsInfo {
-    /// dependencies of package
+    /// dependencies of package(libname -> src_path)
     deps: HashMap<String, path::PathBuf>,
     /// last modified time
     modified: SystemTime,
 }
 
 impl DepsInfo {
-    pub fn get(&self, query: &str) -> Option<path::PathBuf> {
+    pub fn get_src_path(&self, query: &str) -> Option<path::PathBuf> {
         let p = self.deps.get(query)?;
         Some(p.to_owned())
     }
@@ -855,7 +855,8 @@ impl<'c> Session<'c> {
         raw.contains_key(path) && masked.contains_key(path)
     }
 
-    pub fn deps<P: AsRef<path::Path>>(&self, manifest: P) -> Option<Rc<DepsInfo>> {
+    /// get cached dependencies if they exist
+    pub fn get_deps<P: AsRef<path::Path>>(&self, manifest: P) -> Option<Rc<DepsInfo>> {
         let manifest = manifest.as_ref();
         let deps = self.cache.deps_map.borrow();
         if let Some(dep) = deps.get(manifest) {
@@ -874,6 +875,7 @@ impl<'c> Session<'c> {
         }
     }
 
+    /// cache dependencies into session
     pub fn cache_deps<P: AsRef<path::Path>>(
         &self,
         manifest: P,
@@ -1109,7 +1111,7 @@ fn complete_from_file_(filepath: &path::Path, cursor: Location, session: &Sessio
             } else {
                 expr
             }).split("::")
-                .collect::<Vec<_>>();
+            .collect::<Vec<_>>();
 
             let path = Path::from_vec(is_global, v);
             for m in nameres::resolve_path(
@@ -1294,7 +1296,7 @@ pub fn find_definition_(
                         SearchType::ExactMatch,
                         session,
                     ).filter(|m| m.mtype == match_type)
-                        .nth(0)
+                    .nth(0)
                 } else {
                     None
                 }

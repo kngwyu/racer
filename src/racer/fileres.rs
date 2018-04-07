@@ -1,7 +1,7 @@
-use cargo::core::{TargetKind, Workspace};
+use cargo::Config;
+use cargo::core::Workspace;
 use cargo::ops::{resolve_ws_precisely, Packages};
 use cargo::util::important_paths::find_project_manifest;
-use cargo::Config;
 use core::Session;
 use nameres::RUST_SRC_PATH;
 use std::collections::{HashMap, HashSet};
@@ -78,11 +78,12 @@ fn get_outer_crates(libname: &str, from_path: &Path, session: &Session) -> Optio
         tmp_str.replace("_", "-")
     };
     let manifest = cargo_res!(find_project_manifest(from_path, "Cargo.toml"));
-    if let Some(deps_info) = session.deps(&manifest) {
+
+    if let Some(deps_info) = session.get_deps(&manifest) {
         debug!("[get_outer_crates] cache exists");
-        if let Some(p) = deps_info.get(libname) {
+        if let Some(p) = deps_info.get_src_path(libname) {
             Some(p)
-        } else if let Some(p) = deps_info.get(&libname_hyphened) {
+        } else if let Some(p) = deps_info.get_src_path(&libname_hyphened) {
             Some(p)
         } else {
             None
@@ -92,24 +93,23 @@ fn get_outer_crates(libname: &str, from_path: &Path, session: &Session) -> Optio
         let config = cargo_res!(Config::default());
         let ws = cargo_res!(Workspace::new(&manifest, &config));
         let pkg_cur = ws.current_opt()?;
-        let first_deps: HashSet<_> = pkg_cur.dependencies().iter().map(|d| d.name()).collect();
+        // what we need is only packages in toml file!
+        // so, we cache only those packages
+        let toml_deps: HashSet<_> = pkg_cur.dependencies().iter().map(|d| d.name()).collect();
         let specs = cargo_res!(Packages::All.into_package_id_specs(&ws));
         let (packages, _) = cargo_res!(resolve_ws_precisely(&ws, None, &[], false, false, &specs));
         let mut deps_map = HashMap::new();
         let mut res = None;
         for package_id in packages.package_ids() {
-            let pkg = cargo_res!(packages.get(package_id));
-            if !first_deps.contains(pkg.name()) {
+            let pkg = match packages.get(package_id) {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+            if !toml_deps.contains(pkg.name()) {
                 continue;
             }
             let targets = pkg.manifest().targets();
-            let lib_target = targets.into_iter().find(|target| {
-                if let TargetKind::Lib(_) = target.kind() {
-                    true
-                } else {
-                    false
-                }
-            });
+            let lib_target = targets.into_iter().find(|target| target.is_lib());
             if let Some(target) = lib_target {
                 let name = target.name();
                 let src_path = target.src_path().to_owned();
