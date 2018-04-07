@@ -1362,8 +1362,8 @@ fn follows_use_local_package() {
 
     let dir = setup_test_project();
     let srcdir = dir.nested_dir("src");
-    let got = get_one_completion(src, Some(srcdir));
-    assert_eq!(got.matchstr, "foo");
+    let got = get_all_completions(src, Some(srcdir));
+    assert!(got.iter().any(|ma| ma.matchstr == "foo"));
 }
 
 #[test]
