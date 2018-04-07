@@ -3994,8 +3994,8 @@ fn find_crate_doc() {
 Basic Usage.
 
 ```
-extern crate test_fixtures;
-use test_fixtures::foo;
+extern crate fixtures;
+use fixtures::foo;
 fn main {
     println!("Racer")
 }
