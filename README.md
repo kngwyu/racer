@@ -14,3 +14,4 @@
 - [ ] get definition of macros in other crates
 - [ ] complete `try_trait` support
 - [ ] completion based on trait bound
+- [ ] more precise research flag(e.g. `extern crate` in outer crates is not a module)

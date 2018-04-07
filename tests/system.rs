@@ -1362,8 +1362,8 @@ fn follows_use_local_package() {
 
     let dir = setup_test_project();
     let srcdir = dir.nested_dir("src");
-    let got = get_one_completion(src, Some(srcdir));
-    assert_eq!(got.matchstr, "foo");
+    let got = get_all_completions(src, Some(srcdir));
+    assert!(got.iter().any(|ma| ma.matchstr == "foo"));
 }
 
 #[test]
@@ -1374,6 +1374,20 @@ fn follows_use_local_package_hyphend() {
     use test_crate2::~
     ";
 
+    let dir = setup_test_project();
+    let srcdir = dir.nested_dir("src");
+    let got = get_only_completion(src, Some(srcdir));
+    assert_eq!(got.matchstr, "useless_func");
+}
+
+// test for re-export
+#[test]
+fn follows_use_reexport() {
+    let src = "
+    extern crate fixtures;
+
+    use fixtures::use~;
+    ";
     let dir = setup_test_project();
     let srcdir = dir.nested_dir("src");
     let got = get_only_completion(src, Some(srcdir));
@@ -3980,8 +3994,8 @@ fn find_crate_doc() {
 Basic Usage.
 
 ```
-extern crate test_fixtures;
-use test_fixtures::foo;
+extern crate fixtures;
+use fixtures::foo;
 fn main {
     println!("Racer")
 }

@@ -10,6 +10,7 @@ use std::iter::{Fuse, Iterator};
 use std::ops::Deref;
 use std::rc::Rc;
 use std::slice;
+use std::time::SystemTime;
 use std::{fmt, vec};
 use std::{path, str};
 
@@ -625,6 +626,25 @@ pub struct FileCache {
 
     /// The file loader
     loader: Box<FileLoader>,
+
+    /// cahced dependencies(manifest_path -> DepsInfo)
+    deps_map: RefCell<HashMap<path::PathBuf, Rc<DepsInfo>>>,
+}
+
+/// dependencies info of a package
+#[derive(Clone, Debug)]
+pub struct DepsInfo {
+    /// dependencies of package(libname -> src_path)
+    deps: HashMap<String, path::PathBuf>,
+    /// last modified time
+    modified: SystemTime,
+}
+
+impl DepsInfo {
+    pub fn get_src_path(&self, query: &str) -> Option<path::PathBuf> {
+        let p = self.deps.get(query)?;
+        Some(p.to_owned())
+    }
 }
 
 /// Used by the FileCache for loading files
@@ -634,12 +654,17 @@ pub struct FileCache {
 pub trait FileLoader {
     /// Load a single file
     fn load_file(&self, path: &path::Path) -> io::Result<String>;
+    /// last modified time of the file
+    fn modified(&self, path: &path::Path) -> io::Result<SystemTime>;
 }
 
 /// Provide a blanket impl for Arc<T> since Rls uses that
 impl<T: FileLoader> FileLoader for ::std::sync::Arc<T> {
     fn load_file(&self, path: &path::Path) -> io::Result<String> {
         (&self as &T).load_file(path)
+    }
+    fn modified(&self, path: &path::Path) -> io::Result<SystemTime> {
+        (&self as &T).modified(path)
     }
 }
 
@@ -663,6 +688,10 @@ impl FileLoader for DefaultFileLoader {
             String::from_utf8(rawbytes).map_err(|err| io::Error::new(io::ErrorKind::Other, err))
         }
     }
+    fn modified(&self, path: &path::Path) -> io::Result<SystemTime> {
+        let f = File::open(path)?;
+        f.metadata()?.modified()
+    }
 }
 
 impl Default for FileCache {
@@ -683,6 +712,7 @@ impl FileCache {
             raw_map: RefCell::new(HashMap::new()),
             masked_map: RefCell::new(HashMap::new()),
             loader: Box::new(loader),
+            deps_map: RefCell::new(HashMap::new()),
         }
     }
 
@@ -741,6 +771,10 @@ impl FileCache {
             .borrow_mut()
             .insert(filepath.to_path_buf(), msrc.clone());
         msrc
+    }
+
+    fn cache_deps(&self, manifest: path::PathBuf, deps: DepsInfo) {
+        self.deps_map.borrow_mut().insert(manifest, Rc::new(deps));
     }
 }
 
@@ -819,6 +853,44 @@ impl<'c> Session<'c> {
         let raw = self.cache.raw_map.borrow();
         let masked = self.cache.masked_map.borrow();
         raw.contains_key(path) && masked.contains_key(path)
+    }
+
+    /// get cached dependencies if they exist
+    pub fn get_deps<P: AsRef<path::Path>>(&self, manifest: P) -> Option<Rc<DepsInfo>> {
+        let manifest = manifest.as_ref();
+        let deps = self.cache.deps_map.borrow();
+        if let Some(dep) = deps.get(manifest) {
+            let modified = dep.modified;
+            let modified_correct = self.cache
+                .loader
+                .modified(manifest)
+                .unwrap_or(SystemTime::now());
+            if modified_correct > modified {
+                None
+            } else {
+                Some(Rc::clone(dep))
+            }
+        } else {
+            None
+        }
+    }
+
+    /// cache dependencies into session
+    pub fn cache_deps<P: AsRef<path::Path>>(
+        &self,
+        manifest: P,
+        map: HashMap<String, path::PathBuf>,
+    ) {
+        let manifest = manifest.as_ref();
+        let modified = self.cache
+            .loader
+            .modified(manifest)
+            .unwrap_or(SystemTime::now());
+        let deps = DepsInfo {
+            deps: map,
+            modified: modified,
+        };
+        self.cache.cache_deps(manifest.to_owned(), deps);
     }
 }
 

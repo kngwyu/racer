@@ -1,7 +1,7 @@
 use core::{self, Match, MatchType, Point, Scope, Session, SessionExt, SourceByteRange, Ty};
-use typeinf;
 use nameres::{self, resolve_path_with_str};
 use scopes;
+use typeinf;
 
 use std::path::Path;
 use std::rc::Rc;
@@ -10,11 +10,11 @@ use rustc_errors::Handler;
 use rustc_errors::emitter::ColorConfig;
 use syntax::ast::{self, ExprKind, FunctionRetTy, GenericParam, Generics, ItemKind, LitKind,
                   PatKind, TyKind, TyParamBound, TyParamBounds, UseTree, UseTreeKind};
-use syntax::{self, codemap, visit};
 use syntax::parse::parser::Parser;
 use syntax::parse::{self, ParseSess};
 use syntax::print::pprust;
-use syntax_pos::{FileName, Span};
+use syntax::{self, visit, codemap::{self, Span}};
+use syntax_pos::FileName;
 
 // From syntax/util/parser_testing.rs
 pub fn string_to_parser<'a>(ps: &'a ParseSess, source_str: String) -> Parser<'a> {
@@ -323,15 +323,9 @@ fn destructure_pattern_to_ty(
                                 path_to_match(ty, session)
                             }
                         })
-                            .and_then(|ty| {
-                                destructure_pattern_to_ty(
-                                    &child.node.pat,
-                                    point,
-                                    &ty,
-                                    scope,
-                                    session,
-                                )
-                            });
+                        .and_then(|ty| {
+                            destructure_pattern_to_ty(&child.node.pat, point, &ty, scope, session)
+                        });
                         break;
                     }
                 }
@@ -535,10 +529,10 @@ fn find_type_match(path: &core::Path, fpath: &Path, pos: Point, session: &Sessio
         core::Namespace::Type,
         session,
     ).nth(0)
-        .and_then(|m| match m.mtype {
-            MatchType::Type => get_type_of_typedef(m, session, fpath),
-            _ => Some(m),
-        });
+    .and_then(|m| match m.mtype {
+        MatchType::Type => get_type_of_typedef(m, session, fpath),
+        _ => Some(m),
+    });
 
     res.and_then(|mut m| {
         // add generic types to match (if any)
