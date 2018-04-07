@@ -1,13 +1,13 @@
-use {ast, typeinf, util};
-use core::{CompletionType, Point, SourceByteRange, Src};
 #[cfg(test)]
 use core::{self, Coordinate};
+use core::{CompletionType, Point, SourceByteRange, Src};
+use {ast, typeinf, util};
 
+use codecleaner::comment_skip_iter_rev;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::str::from_utf8;
 use util::{char_at, closure_valid_arg_scope};
-use codecleaner::comment_skip_iter_rev;
 
 fn find_close<'a, A>(iter: A, open: u8, close: u8, level_end: u32) -> Option<Point>
 where

@@ -1,20 +1,20 @@
 // Name resolution
 
-use {ast, core, matchers, scopes, typeinf};
-use core::SearchType::{self, ExactMatch, StartsWith};
-use core::{Coordinate, Match, Point, Session, SessionExt, Src, Ty};
 use core::MatchType::{Builtin, Enum, EnumVariant, FnArg, Function, Impl, MatchArm, Module, Struct,
                       StructField, Trait, TraitBounds, TraitImpl};
 use core::Namespace;
+use core::SearchType::{self, ExactMatch, StartsWith};
+use core::{Coordinate, Match, Point, Session, SessionExt, Src, Ty};
+use {ast, core, matchers, scopes, typeinf};
 
-use util::{self, calculate_str_hash, closure_valid_arg_scope, find_ident_end, get_rust_src_path,
-           symbol_matches, txt_matches};
+use fileres::{get_crate_file, get_module_file};
+use matchers::PendingImports;
 use matchers::find_doc;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::{self, vec};
-use std::collections::HashSet;
-use matchers::PendingImports;
-use fileres::{get_crate_file, get_module_file};
+use util::{self, calculate_str_hash, closure_valid_arg_scope, find_ident_end, get_rust_src_path,
+           symbol_matches, txt_matches};
 
 lazy_static! {
     pub static ref RUST_SRC_PATH: PathBuf = get_rust_src_path().unwrap();
@@ -1640,12 +1640,12 @@ pub fn get_super_scope(
             session,
             pending_imports,
         ).nth(0)
-            .and_then(|m| {
-                msrc[m.point..].find('{').map(|p| core::Scope {
-                    filepath: filepath.to_path_buf(),
-                    point: m.point + p + 1,
-                })
+        .and_then(|m| {
+            msrc[m.point..].find('{').map(|p| core::Scope {
+                filepath: filepath.to_path_buf(),
+                point: m.point + p + 1,
             })
+        })
     }
 }
 
@@ -1964,7 +1964,7 @@ pub fn resolve_method(
                     session,
                     pending_imports,
                 ).filter(|m| m.mtype == Trait)
-                    .nth(0);
+                .nth(0);
                 if let Some(m) = m {
                     debug!("found trait : match is |{:?}|", m);
                     let mut out = Vec::new();
@@ -2319,12 +2319,10 @@ fn search_for_deref_matches(
         else {
             let deref_type_path = core::Path {
                 global: false,
-                segments: vec![
-                    core::PathSegment {
-                        name: impl_match.generic_args.first().unwrap().clone(),
-                        types: Vec::new(),
-                    },
-                ],
+                segments: vec![core::PathSegment {
+                    name: impl_match.generic_args.first().unwrap().clone(),
+                    types: Vec::new(),
+                }],
             };
             let type_match = resolve_path_with_str(
                 &deref_type_path,

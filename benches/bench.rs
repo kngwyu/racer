@@ -4,13 +4,13 @@ extern crate test;
 
 use racer::codecleaner::code_chunks;
 use racer::codeiter::iter_stmts;
-use racer::scopes::{mask_comments, mask_sub_scopes};
 use racer::core::IndexedSource;
+use racer::scopes::{mask_comments, mask_sub_scopes};
 
 use self::test::Bencher;
 use std::env::var;
-use std::io::Read;
 use std::fs::File;
+use std::io::Read;
 use std::path::PathBuf;
 
 fn get_rust_file_str(path: &[&str]) -> String {

@@ -6,11 +6,11 @@ extern crate clap;
 
 extern crate racer;
 
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use racer::{Coordinate, FileCache, Match, MatchType, Point, Session};
 use std::fs::File;
-use std::path::{Path, PathBuf};
 use std::io::{self, BufRead, Read};
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use std::path::{Path, PathBuf};
 
 fn point(cfg: Config) {
     let cache = FileCache::default();

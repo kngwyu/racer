@@ -20,15 +20,15 @@ doc = false
 [dependencies]
 log = "0.4"
 env_logger = "0.5"
-cargo = "0.25"
+cargo = "0.26"
 clap = "2.31"
 lazy_static = "1.0"
-rustc-ap-rustc_errors = "73.0.0"
-rustc-ap-syntax = "73.0.0"
-rustc-ap-syntax_pos = "73.0.0"
+rustc-ap-rustc_errors = "89.0.0"
+rustc-ap-syntax = "89.0.0"
+rustc-ap-syntax_pos = "89.0.0"
 
 [dependencies.clippy]
-version = "0.0.189"
+version = "0.0.192"
 optional = true
 
 [dev-dependencies]

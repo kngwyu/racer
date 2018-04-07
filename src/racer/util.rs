@@ -1,12 +1,12 @@
 // Small functions of utility
 use std::cmp;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::path;
 use std::rc::Rc;
-use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
 
-use core::{IndexedSource, Location, LocationExt, Point, Session, SessionExt};
 use core::SearchType::{self, ExactMatch, StartsWith};
+use core::{IndexedSource, Location, LocationExt, Point, Session, SessionExt};
 
 #[cfg(unix)]
 pub const PATH_SEP: char = ':';

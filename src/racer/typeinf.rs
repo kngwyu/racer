@@ -1,15 +1,15 @@
 // Type inference
 
-use core::{Match, Point, Scope, Session, SessionExt, Src};
-use nameres::resolve_path_with_str;
-use core::Namespace;
-use core;
 use ast;
-use scopes;
-use matchers;
+use core;
+use core::Namespace;
 use core::SearchType::ExactMatch;
-use util::{self, txt_matches};
+use core::{Match, Point, Scope, Session, SessionExt, Src};
+use matchers;
+use nameres::resolve_path_with_str;
+use scopes;
 use std::path::Path;
+use util::{self, txt_matches};
 
 fn find_start_of_function_body(src: &str) -> Point {
     // TODO: this should ignore anything inside parens so as to skip the arg list
@@ -115,7 +115,7 @@ pub fn get_type_of_self(
                 Namespace::Type,
                 session,
             ).nth(0)
-                .map(core::Ty::Match)
+            .map(core::Ty::Match)
         } else {
             // // must be a trait
             ast::parse_trait(decl).name.and_then(|name| {
@@ -342,7 +342,7 @@ pub fn get_type_of_match(m: Match, msrc: Src, session: &Session) -> Option<core:
 }
 
 macro_rules! otry {
-    ($e: expr) => {
+    ($e:expr) => {
         match $e {
             Some(e) => e,
             None => return None,

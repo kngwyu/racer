@@ -627,16 +627,16 @@ pub struct FileCache {
     /// The file loader
     loader: Box<FileLoader>,
 
-    /// cahced dependencies(manifest_path -> DepsInfo)
+    /// cached dependencies(manifest_path -> DepsInfo)
     deps_map: RefCell<HashMap<path::PathBuf, Rc<DepsInfo>>>,
 }
 
 /// dependencies info of a package
 #[derive(Clone, Debug)]
 pub struct DepsInfo {
-    /// dependencies of package(libname -> src_path)
+    /// dependencies of a package(libname -> src_path)
     deps: HashMap<String, path::PathBuf>,
-    /// last modified time
+    /// last modified time of Cargo.toml
     modified: SystemTime,
 }
 

@@ -1,15 +1,15 @@
-use {ast, scopes, typeinf};
-use core::{Coordinate, Match, PathSegment, Point, Session, SessionExt, Src};
-use util::{char_at, find_ident_end, is_ident_char, symbol_matches, txt_matches,
-           StackLinkedListNode};
-use nameres::resolve_path;
-use fileres::{get_crate_file, get_module_file};
-use core::SearchType::{self, ExactMatch, StartsWith};
 use core::MatchType::{self, Const, Enum, EnumVariant, For, Function, IfLet, Let, Macro, Module,
                       Static, Struct, Trait, Type, WhileLet};
 use core::Namespace;
+use core::SearchType::{self, ExactMatch, StartsWith};
+use core::{Coordinate, Match, PathSegment, Point, Session, SessionExt, Src};
+use fileres::{get_crate_file, get_module_file};
+use nameres::resolve_path;
 use std::path::Path;
 use std::{iter, option, str, vec};
+use util::{char_at, find_ident_end, is_ident_char, symbol_matches, txt_matches,
+           StackLinkedListNode};
+use {ast, scopes, typeinf};
 
 /// The location of an import (`use` item) currently being resolved.
 #[derive(PartialEq, Eq)]
@@ -874,7 +874,7 @@ pub fn match_use(
     }
     // common utilities
     macro_rules! with_match {
-        ($path: expr, $f: expr) => {
+        ($path:expr, $f:expr) => {
             if let Some(mut m) = resolve_path(
                 $path,
                 filepath,
