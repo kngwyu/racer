@@ -16,3 +16,15 @@
 - [ ] complete `try_trait` support
 - [ ] completion based on trait bound
 - [ ] more precise research flag(e.g. `extern crate` in outer crates is not a module)
+
+## install
+Now I'm completely not sure I should merge this branch to upstream or not, so this branch is not available in crate.io for a while.
+
+To install manually,
+``` bash
+rustup update nightly
+git clone https://github.com/kngwyu/racer-nightly.git
+cd racer-nightly
+cargo +nightly install -f
+```
+
