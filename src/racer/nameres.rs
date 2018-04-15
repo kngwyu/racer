@@ -1205,14 +1205,11 @@ fn search_closure_args(
         if txt_matches(search_type, searchstr, pipe_scope) {
             // Add a fake body for parsing
             let closure_def = String::from(pipe_scope) + "{}";
-
             let coords = ast::parse_fn_args(closure_def.clone());
 
             let mut out: Vec<Match> = Vec::new();
-
             for (start, end) in coords {
                 let s = &closure_def[start..end];
-
                 if symbol_matches(search_type, searchstr, s) {
                     let m = Match {
                         matchstr: s.to_owned(),

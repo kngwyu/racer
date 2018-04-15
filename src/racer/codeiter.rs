@@ -117,8 +117,7 @@ where
                     }
                     _ => {}
                 }
-
-                if enddelim == b && bracelevel == 0 && parenlevel == 0 {
+                if enddelim == b && bracelevel == 0 && parenlevel <= 0 {
                     self.pos = pos;
                     return Some((start, pos));
                 }

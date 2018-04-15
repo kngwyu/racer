@@ -4022,6 +4022,7 @@ fn completes_methods_for_global_enum() {
     assert_eq!(get_only_completion(src, None).matchstr, "unwrap_or_default");
 }
 
+// For issue 785
 #[test]
 fn completes_methods_for_local_enum() {
     let src = "
@@ -4037,6 +4038,23 @@ fn completes_methods_for_local_enum() {
     }
     ";
     assert_eq!(get_only_completion(src, None).matchstr, "method");
+}
+
+#[test]
+fn completes_methods_for_closure_arg() {
+    let src = r"
+        fn main() {
+            let mut v = Vec::new();
+            v.push(3);
+            let s = Some(v);
+            let x = s.map(|v: Vec<i32>| v.appen~);
+        }
+    ";
+    assert!(
+        get_all_completions(src, None)
+            .into_iter()
+            .any(|ma| ma.matchstr == "append")
+    );
 }
 
 // issue 706
