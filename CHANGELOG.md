@@ -4,8 +4,12 @@ Change Log
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning](http://semver.org/).
 
+# 2.1.2
+- Support method completion for closure arguments(#5).
+
+
 ## 2.1.1
-replace current cargo.rs with `cargo` crate and add dependencies cache.
+- Replace current cargo.rs with `cargo` crate and add dependencies cache.
 
 For details, see [#3](https://github.com/kngwyu/racer-nightly/pull/3) and [#4](https://github.com/kngwyu/racer-nightly/pull/4).
 

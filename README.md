@@ -12,6 +12,7 @@
 - [x] support [use_nested_groups](https://github.com/rust-lang/rust/issues/44494)
 - [x] rewrite get_crate_file using `cargo` crate
   - [x] cache `src_path`s of outer crates
+- [x] method completion for closure args
 - [ ] get definition of macros in other crates
 - [ ] complete `try_trait` support
 - [ ] completion based on trait bound
