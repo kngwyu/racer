@@ -4057,6 +4057,22 @@ fn completes_methods_for_closure_arg() {
     );
 }
 
+#[test]
+fn completes_methods_for_tuple_struct() {
+    let src = r"
+        fn main() {
+            struct A(i32, Vec<i32>);
+            let mut a = A(0, vec![3, 4]);
+            a.1.appen~
+        }
+    ";
+    assert!(
+        get_all_completions(src, None)
+            .into_iter()
+            .any(|ma| ma.matchstr == "append")
+    );
+}
+
 // issue 706
 mod trait_bounds {
     use super::*;

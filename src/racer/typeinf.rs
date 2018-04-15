@@ -286,12 +286,16 @@ pub fn get_struct_field_type(
     session: &Session,
 ) -> Option<core::Ty> {
     assert!(structmatch.mtype == core::MatchType::Struct);
-
+    debug!("[get_struct_filed_type]{}, {:?}", fieldname, structmatch);
     let src = session.load_file(&structmatch.filepath);
 
     let opoint = scopes::expect_stmt_start(src.as_src(), structmatch.point);
     let structsrc = scopes::end_of_next_scope(&src[opoint..]);
-
+    let structsrc = if structsrc == "" {
+        (*get_first_stmt(src.as_src().from(opoint))).to_owned()
+    } else {
+        structsrc.to_owned()
+    };
     let fields = ast::parse_struct_fields(structsrc.to_owned(), Scope::from_match(structmatch));
     for (field, _, ty) in fields.into_iter() {
         if fieldname == field {
