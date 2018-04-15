@@ -478,7 +478,7 @@ fn to_racer_path(path: &ast::Path) -> core::Path {
     let mut v = Vec::new();
     let mut global = false;
     for seg in &path.segments {
-        let name = seg.identifier.name.to_string();
+        let name = seg.ident.name.to_string();
         let mut types = Vec::new();
         // TODO: this is for backword compatibility & maybe we have to rewrite core::Path
         if name == "{{root}}" {
@@ -664,7 +664,7 @@ impl<'c, 's, 'ast> visit::Visitor<'ast> for ExprTypeVisitor<'c, 's> {
 
             ExprKind::MethodCall(ref method_def, ref arguments) => {
                 // spannedident.node is an ident I think
-                let methodname = method_def.identifier.name.as_str();
+                let methodname = method_def.ident.name.as_str();
                 debug!("[method call] name: {}", methodname);
 
                 // arguments[0] is receiver(e.g. self)
@@ -702,11 +702,11 @@ impl<'c, 's, 'ast> visit::Visitor<'ast> for ExprTypeVisitor<'c, 's> {
             }
 
             ExprKind::Field(ref subexpression, spannedident) => {
-                let fieldname = spannedident.node.name.to_string();
+                let fieldname = spannedident.name.to_string();
                 debug!("exprfield {}", fieldname);
                 self.visit_expr(subexpression);
-                self.result = self.result.as_ref().and_then(|structm| match *structm {
-                    Ty::Match(ref structm) => {
+                self.result = self.result.as_ref().and_then(|structm| match structm {
+                    Ty::Match(structm) => {
                         typeinf::get_struct_field_type(&fieldname, structm, self.session).and_then(
                             |fieldtypepath| {
                                 find_type_match_including_generics(
@@ -756,27 +756,6 @@ impl<'c, 's, 'ast> visit::Visitor<'ast> for ExprTypeVisitor<'c, 's> {
                 } else {
                     Some(Ty::Unsupported)
                 };
-            }
-
-            ExprKind::TupField(ref subexpression, ref spanned_index) => {
-                let fieldnum = spanned_index.node;
-                debug!("tupfield {:?}", fieldnum);
-                self.visit_expr(subexpression);
-                self.result = self.result.as_ref().and_then(|ty| match *ty {
-                    Ty::Match(ref structm) => {
-                        typeinf::get_tuplestruct_field_type(fieldnum, structm, &self.session)
-                            .and_then(|fieldtypepath| {
-                                find_type_match_including_generics(
-                                    &fieldtypepath,
-                                    &structm.filepath,
-                                    structm.point,
-                                    structm,
-                                    self.session,
-                                )
-                            })
-                    }
-                    _ => None,
-                });
             }
 
             ExprKind::Try(ref expr) => {
@@ -1212,7 +1191,7 @@ impl GenericsList {
                     GenericParam::Lifetime(_) => None,
                     GenericParam::Type(ty_param) => {
                         let param_name = ty_param.ident.name.as_str().to_string();
-                        let codemap::BytePos(point) = ty_param.span.lo();
+                        let codemap::BytePos(point) = ty_param.ident.span.lo();
                         let bounds =
                             TraitBounds::from_ty_param_bounds(&ty_param.bounds, &file_path, offset);
                         Some(GenericsArg {
@@ -1265,7 +1244,7 @@ impl<'ast> visit::Visitor<'ast> for EnumVisitor {
             for variant in &enum_definition.variants {
                 let codemap::BytePos(point) = variant.span.lo();
                 self.values
-                    .push((variant.node.name.to_string(), point as usize));
+                    .push((variant.node.ident.name.to_string(), point as usize));
             }
         }
     }

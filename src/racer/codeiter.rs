@@ -23,6 +23,7 @@ where
         let src_bytes = self.src.as_bytes();
         let mut enddelim = b';';
         let mut bracelevel = 0isize;
+        let mut bracketlevel = 0isize;
         let mut parenlevel = 0isize;
         let mut start = self.pos;
         let mut pos = self.pos;
@@ -83,6 +84,12 @@ where
                     b')' => {
                         parenlevel -= 1;
                     }
+                    b'[' => {
+                        bracketlevel += 1;
+                    }
+                    b']' => {
+                        bracketlevel -= 1;
+                    }
                     b'{' => {
                         // if we are top level and stmt is not a 'use' or 'let' then
                         // closebrace finishes the stmt
@@ -117,8 +124,7 @@ where
                     }
                     _ => {}
                 }
-
-                if enddelim == b && bracelevel == 0 && parenlevel == 0 {
+                if enddelim == b && bracelevel == 0 && parenlevel <= 0 && bracketlevel == 0 {
                     self.pos = pos;
                     return Some((start, pos));
                 }
@@ -171,6 +177,22 @@ mod test {
             pos: 0,
             end: 0,
         }.fuse()
+    }
+
+    #[test]
+    fn iterates_array_stmts() {
+        let src = rejustify(
+            "
+            let a: [i32; 2] = [1, 2];
+            let b = [[0], [1], [2]];
+            let c = ([1, 2, 3])[1];
+        ",
+        );
+
+        let mut it = iter_stmts(src.as_ref());
+        assert_eq!("let a: [i32; 2] = [1, 2];", slice(&src, it.next().unwrap()));
+        assert_eq!("let b = [[0], [1], [2]];", slice(&src, it.next().unwrap()));
+        assert_eq!("let c = ([1, 2, 3])[1];", slice(&src, it.next().unwrap()));
     }
 
     #[test]
