@@ -10,7 +10,7 @@ use std::iter::{Fuse, Iterator};
 use std::ops::Deref;
 use std::rc::Rc;
 use std::slice;
-use std::time::SystemTime;
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fmt, vec};
 use std::{path, str};
 
@@ -861,10 +861,7 @@ impl<'c> Session<'c> {
         let deps = self.cache.deps_map.borrow();
         if let Some(dep) = deps.get(manifest) {
             let modified = dep.modified;
-            let modified_correct = self.cache
-                .loader
-                .modified(manifest)
-                .unwrap_or(SystemTime::now());
+            let modified_correct = self.cache.loader.modified(manifest).unwrap_or(UNIX_EPOCH);
             if modified_correct > modified {
                 None
             } else {
@@ -1111,7 +1108,7 @@ fn complete_from_file_(filepath: &path::Path, cursor: Location, session: &Sessio
             } else {
                 expr
             }).split("::")
-            .collect::<Vec<_>>();
+                .collect::<Vec<_>>();
 
             let path = Path::from_vec(is_global, v);
             for m in nameres::resolve_path(
@@ -1296,7 +1293,7 @@ pub fn find_definition_(
                         SearchType::ExactMatch,
                         session,
                     ).filter(|m| m.mtype == match_type)
-                    .nth(0)
+                        .nth(0)
                 } else {
                     None
                 }
