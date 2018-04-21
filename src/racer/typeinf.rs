@@ -161,7 +161,16 @@ fn get_type_of_fnarg(m: &Match, msrc: Src, session: &Session) -> Option<core::Ty
     if m.matchstr == "self" {
         return get_type_of_self_arg(m, msrc, session);
     }
-    let stmtstart = scopes::expect_stmt_start(msrc, m.point);
+    let stmtstart = match scopes::find_stmt_start(msrc, m.point) {
+        Some(s) => s,
+        None => {
+            warn!(
+                "[get_type_of_fnarg] start of statement was not found for {:?}",
+                m
+            );
+            return None;
+        }
+    };
     let block = msrc.from(stmtstart);
     let (start, end) = block.iter_stmts().nth(0)?;
     let blob = &msrc[(stmtstart + start)..(stmtstart + end)];

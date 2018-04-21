@@ -87,6 +87,12 @@ pub fn scope_start(src: Src, point: Point) -> Point {
 pub fn find_stmt_start(msrc: Src, point: Point) -> Option<Point> {
     // Iterate the scope to find the start of the statement that surrounds the point.
     let scopestart = scope_start(msrc, point);
+    debug!(
+        "[find_stmt_start] now we are in scope {} ~ {}, {}",
+        scopestart,
+        point,
+        &msrc[scopestart..point + 1]
+    );
     msrc.from(scopestart)
         .iter_stmts()
         .find(|&(start, end)| scopestart + start < point && point < scopestart + end)
@@ -95,7 +101,7 @@ pub fn find_stmt_start(msrc: Src, point: Point) -> Option<Point> {
 
 /// Finds a statement start or panics.
 pub fn expect_stmt_start(msrc: Src, point: Point) -> Point {
-    find_stmt_start(msrc, point).expect("Statement has a beginning")
+    find_stmt_start(msrc, point).expect("Statement doesn't has a beginning")
 }
 
 /// Finds the start of a `let` statement; includes handling of struct pattern matches in the
