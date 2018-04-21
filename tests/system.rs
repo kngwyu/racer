@@ -4077,7 +4077,6 @@ fn completes_methods_for_tuple_struct() {
 mod trait_bounds {
     use super::*;
     #[test]
-    #[ignore]
     fn completes_methods_for_fnarg_by_trait_bounds() {
         let src = "
         fn main() {
@@ -4093,7 +4092,6 @@ mod trait_bounds {
     }
 
     #[test]
-    #[ignore]
     fn completes_external_methods_for_fnarg_by_trait_bounds() {
         let src = "
         fn main() {
@@ -4110,7 +4108,6 @@ mod trait_bounds {
     }
 
     #[test]
-    #[ignore]
     fn completes_inherited_methods_for_fnarg_by_trait_bounds() {
         let src = "
         fn main() {
@@ -4130,7 +4127,6 @@ mod trait_bounds {
 
     // test for checking racer don't cause INF loop
     #[test]
-    #[ignore]
     fn completes_inherited_methods_with_cycle() {
         let src = "
         fn main() {

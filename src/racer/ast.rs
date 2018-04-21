@@ -38,14 +38,6 @@ where
     f(&mut p)
 }
 
-// parse a string, return a stmt
-pub fn string_to_stmt(source_str: String) -> Option<ast::Stmt> {
-    with_error_checking_parse(source_str, |p| match p.parse_stmt() {
-        Ok(Some(stmt)) => Some(stmt),
-        _ => None,
-    })
-}
-
 // TODO: Option -> Result
 pub fn with_stmt(source_str: String, f: impl FnOnce(&ast::Stmt)) -> Option<()> {
     with_error_checking_parse(source_str, |p| {
@@ -1175,6 +1167,9 @@ impl GenericsList {
     fn find_type_param(&self, name: &str) -> Option<&GenericsArg> {
         self.inner.iter().find(|v| &v.name == name)
     }
+    fn append(&mut self, mut other: GenericsList) {
+        self.inner.append(&mut other.inner);
+    }
     fn from_generics<'a, P: AsRef<Path>>(
         generics: &'a Generics,
         file_path: P,
@@ -1300,8 +1295,7 @@ pub fn parse_inherited_traits<P: AsRef<Path>>(
         file_path: filepath,
         offset: offset,
     };
-    let stmt = string_to_stmt(s)?;
-    visit::walk_stmt(&mut v, &stmt);
+    with_stmt(s, |stmt| visit::walk_stmt(&mut v, stmt));
     v.result
 }
 
@@ -1351,12 +1345,13 @@ pub fn parse_fn_arg_type(
     session: &Session,
     offset: i32,
 ) -> Option<core::Ty> {
-    debug!("parse_fn_arg {} |{}|", argpos, s);
+    debug!("[parse_fn_arg] {} |{}|", argpos, s);
     let mut v = FnArgTypeVisitor {
         argpos: argpos,
         scope: scope,
         result: None,
         offset: offset,
+        generics_list: GenericsList::default(),
         session: session,
     };
     with_stmt(s, |stmt| visit::walk_stmt(&mut v, stmt));
@@ -1446,6 +1441,7 @@ pub struct FnArgTypeVisitor<'c: 's, 's> {
     argpos: Point,
     scope: Scope,
     session: &'s Session<'c>,
+    generics_list: GenericsList,
     /// the code point search string starts
     /// use i32 for the case `impl blah {` in inserted
     offset: i32,
@@ -1453,15 +1449,26 @@ pub struct FnArgTypeVisitor<'c: 's, 's> {
 }
 
 impl<'c, 's, 'ast> visit::Visitor<'ast> for FnArgTypeVisitor<'c, 's> {
+    fn visit_generics(&mut self, g: &'ast Generics) {
+        let filepath = &self.scope.filepath;
+        let generics = GenericsList::from_generics(g, filepath, self.offset);
+        debug!(
+            "[FnArgTypeVisitor::visit_generics] {:?}",
+            self.generics_list.get_idents()
+        );
+        self.generics_list.append(generics);
+    }
+
     fn visit_fn(&mut self, _fk: visit::FnKind, fd: &ast::FnDecl, _: codemap::Span, _: ast::NodeId) {
+        debug!("[FnArgTypeVisitor::visit_fn] inputs: {:?}", fd.inputs);
         // Get generics arguments here (just for speed up)
         let filepath = &self.scope.filepath;
-        // STUB(now FnArg has no genrics info so we have to rewrite this logic)
-        let generics_list = GenericsList::default();
-        for arg in &fd.inputs {
-            if point_is_in_span(self.argpos as u32, &arg.pat.span) {
-                debug!("fn arg visitor found type {:?}", arg.ty);
-                self.result = to_racer_ty(&arg.ty, &self.scope)
+        self.result = fd.inputs
+            .iter()
+            .find(|arg| point_is_in_span(self.argpos as u32, &arg.pat.span))
+            .and_then(|arg| {
+                debug!("[FnArgTypeVisitor::visit_fn] type {:?} was found", arg.ty);
+                let ty = to_racer_ty(&arg.ty, &self.scope)
                     .and_then(|ty| {
                         destructure_pattern_to_ty(
                             &arg.pat,
@@ -1471,25 +1478,23 @@ impl<'c, 's, 'ast> visit::Visitor<'ast> for FnArgTypeVisitor<'c, 's> {
                             self.session,
                         )
                     })
-                    .and_then(|ty| {
-                        let ty = destruct_ty_refptr(ty);
-                        if let Ty::PathSearch(ref path, ref scope) = ty {
-                            let segments = &path.segments;
-                            if segments.len() == 1 {
-                                let name = &segments[0].name;
-                                if let Some(bounds) = generics_list.find_type_param(name) {
-                                    let res = bounds.to_owned().into_match(filepath)?;
-                                    return Some(Ty::Match(res));
-                                }
-                            }
-                            find_type_match(path, &scope.filepath, scope.point, self.session)
-                        } else {
-                            Some(ty)
+                    .map(destruct_ty_refptr)?;
+                if let Ty::PathSearch(ref path, ref scope) = ty {
+                    let segments = &path.segments;
+                    // now we want to get 'T' from fn f<T>(){},
+                    // so segments.len() == 1
+                    if segments.len() == 1 {
+                        let name = &segments[0].name;
+                        if let Some(bounds) = self.generics_list.find_type_param(name) {
+                            let res = bounds.to_owned().into_match(filepath)?;
+                            return Some(Ty::Match(res));
                         }
-                    });
-                return;
-            }
-        }
+                    }
+                    find_type_match(path, &scope.filepath, scope.point, self.session)
+                } else {
+                    Some(ty)
+                }
+            });
     }
 }
 
