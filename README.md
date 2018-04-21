@@ -26,6 +26,6 @@ To install manually,
 rustup update nightly
 git clone https://github.com/kngwyu/racer-nightly.git
 cd racer-nightly
-cargo +nightly install -f
+cargo +nightly install --path . -f
 ```
 
