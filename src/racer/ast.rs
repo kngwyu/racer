@@ -6,15 +6,13 @@ use typeinf;
 use std::path::Path;
 use std::rc::Rc;
 
-use rustc_errors::Handler;
-use rustc_errors::emitter::ColorConfig;
 use syntax::ast::{self, ExprKind, FunctionRetTy, GenericParam, Generics, ItemKind, LitKind,
                   PatKind, TyKind, TyParamBound, TyParamBounds, UseTree, UseTreeKind};
+use syntax::errors::{Handler, emitter::ColorConfig};
 use syntax::parse::parser::Parser;
 use syntax::parse::{self, ParseSess};
 use syntax::print::pprust;
-use syntax::{self, visit, codemap::{self, Span}};
-use syntax_pos::FileName;
+use syntax::{self, visit, codemap::{self, FileName, Span}};
 
 // From syntax/util/parser_testing.rs
 pub fn string_to_parser<'a>(ps: &'a ParseSess, source_str: String) -> Parser<'a> {

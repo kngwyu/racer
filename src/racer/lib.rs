@@ -8,9 +8,7 @@ extern crate cargo;
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
-extern crate rustc_errors;
 extern crate syntax;
-extern crate syntax_pos;
 
 #[macro_use]
 mod testutils;

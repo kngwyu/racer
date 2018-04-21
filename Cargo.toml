@@ -23,13 +23,11 @@ env_logger = "0.5"
 cargo = "0.26"
 clap = "2.31"
 lazy_static = "1.0"
-rustc-ap-rustc_errors = "100.0.0"
-rustc-ap-syntax = "100.0.0"
-rustc-ap-syntax_pos = "100.0.0"
+rustc-ap-syntax = "106.0.0"
 
 [dependencies.clippy]
-version = "0.0.192"
+version = "0.0.195"
 optional = true
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = "3.0"
