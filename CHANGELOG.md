@@ -4,9 +4,11 @@ Change Log
 All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning](http://semver.org/).
 
+# 2.1.3
+- Enable code completion based on trait bounds for function args(#6)
+
 # 2.1.2
 - Support method completion for closure arguments(#5).
-
 
 ## 2.1.1
 - Replace current cargo.rs with `cargo` crate and add dependencies cache.
