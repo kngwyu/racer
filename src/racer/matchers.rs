@@ -901,6 +901,7 @@ pub fn match_use(
                     continue;
                 }
                 with_match!(path_alias.as_ref(), |m: &mut Match| {
+                    debug!("[match_use] PathAliasKind::Ident {:?} was found", ident);
                     if m.matchstr != *ident {
                         m.matchstr = ident.clone();
                     }
@@ -914,6 +915,7 @@ pub fn match_use(
                         continue;
                     }
                     with_match!(path_alias.as_ref(), |m: &mut Match| {
+                        debug!("[match_use] PathAliasKind::Self_ {:?} was found", ident);
                         if is_aliased && m.matchstr != *ident {
                             m.matchstr = ident.clone();
                         }
@@ -938,6 +940,10 @@ pub fn match_use(
                 if search_type == StartsWith {
                     return path_iter.collect();
                 }
+                debug!(
+                    "[match_use] resolve_path returned {:?} for PathAliasKind::Glob",
+                    path_iter
+                );
                 if let Some(m) = path_iter.nth(0) {
                     out.push(m);
                 }
