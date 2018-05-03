@@ -1,7 +1,5 @@
-#[cfg(test)]
 use core::SourceByteRange;
 
-#[cfg(test)]
 pub fn rejustify(src: &str) -> String {
     let s = &src[1..]; // remove the newline
     let mut sb = String::new();
@@ -17,7 +15,6 @@ pub fn rejustify(src: &str) -> String {
     sb
 }
 
-#[cfg(test)]
 pub fn slice(src: &str, (begin, end): SourceByteRange) -> &str {
     &src[begin..end]
 }
