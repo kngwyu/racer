@@ -86,39 +86,35 @@ pub fn closure_valid_arg_scope(scope_src: &str) -> Option<(usize, usize, &str)> 
     } else {
         return None;
     };
-    let rest_scope = &scope_src[left_pipe + 1..];
-    let right_pipe = if let Some(pos) = rest_scope.find('|') {
-        left_pipe + 1 + pos
-    } else {
-        return None;
-    };
-
-    let pipe_scope = &scope_src[left_pipe..right_pipe + 1];
-
-    // For each '{' increase the counter by one and for each '}' decrease the counter by one
-    // If we have a equal number of curly brackets, we should get 0 as result
-    let curly_brackets = pipe_scope.chars().fold(0, |count, c| {
-        if c == '{' {
-            count + 1
-        } else if c == '}' {
-            count - 1
-        } else {
-            count
+    let candidate = &scope_src[left_pipe..];
+    let (mut brace_level, mut bracket_level, mut paren_level) = (0, 0, 0);
+    let mut right_pipe = left_pipe;
+    let mut found = false;
+    for c in candidate.chars().skip(1) {
+        right_pipe += 1;
+        match c {
+            '{' => brace_level += 1,
+            '}' => brace_level -= 1,
+            '<' => bracket_level += 1,
+            '>' => bracket_level -= 1,
+            '(' => paren_level += 1,
+            ')' => paren_level -= 1,
+            '|' => {
+                found = true;
+                break;
+            }
+            ';' => return None,
+            _ => {}
         }
-    });
-
-    // If we found an unequal number of curly brackets in the scope, this can not be a valid
-    // closure definition
-    if curly_brackets != 0 {
+        if brace_level < 0 || bracket_level < 0 || paren_level < 0 {
+            return None;
+        }
+    }
+    if !found || brace_level != 0 || bracket_level != 0 || paren_level != 0 {
         return None;
     }
-
-    // If we find a ';' --> no closure definition
-    if pipe_scope.contains(';') {
-        return None;
-    }
-
-    Some((left_pipe, right_pipe, pipe_scope))
+    let res = &scope_src[left_pipe..right_pipe + 1];
+    Some((left_pipe, right_pipe, res))
 }
 
 // pub fn get_backtrace() -> String {

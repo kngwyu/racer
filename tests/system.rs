@@ -3957,3 +3957,33 @@ mod trait_bounds {
         assert_eq!(get_only_completion(src, None).matchstr, "inherited");
     }
 }
+
+// for issue 847
+// TODO: better test name
+#[test]
+fn match_statements_similar_to_closure_args() {
+    let src = r#"
+fn main() {
+    enum EnumA {
+        A,
+        B,
+    }
+    enum EnumB {
+        A(usize),
+        B(usize),
+    }
+    let a = EnumA::A;
+    let b = EnumB::A(5);
+    match a {
+        EnumA::A => match b {
+            EnumB::A(u) | Enu~mB::B(u) => println!("u: {}", u),
+        },
+        EnumA::B => match b {
+            EnumB::A(u) | EnumB::B(u) => println!("u: {}", u),
+        },
+    }
+}
+"#;
+    let got = get_definition(src, None);
+    assert_eq!(got.matchstr, "EnumB");
+}
