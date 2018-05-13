@@ -1,6 +1,6 @@
 use cargo::core::Workspace;
 use cargo::ops::{resolve_ws_precisely, Packages};
-use cargo::util::important_paths::find_project_manifest;
+use cargo::util::important_paths::find_root_manifest_for_wd;
 use cargo::Config;
 use core::Session;
 use nameres::RUST_SRC_PATH;
@@ -77,7 +77,7 @@ fn get_outer_crates(libname: &str, from_path: &Path, session: &Session) -> Optio
         let tmp_str = libname.to_owned();
         tmp_str.replace("_", "-")
     };
-    let manifest = cargo_res!(find_project_manifest(from_path, "Cargo.toml"));
+    let manifest = cargo_res!(find_root_manifest_for_wd(from_path));
 
     if let Some(deps_info) = session.get_deps(&manifest) {
         debug!("[get_outer_crates] cache exists");
@@ -97,7 +97,7 @@ fn get_outer_crates(libname: &str, from_path: &Path, session: &Session) -> Optio
         // so, we cache only those packages
         let toml_deps: HashSet<_> = pkg_cur.dependencies().iter().map(|d| d.name()).collect();
         let specs = cargo_res!(Packages::All.into_package_id_specs(&ws));
-        // now we set 'all_features=true'
+        // now we resolve dependncies with 'all_features=true'
         let (packages, _) = cargo_res!(resolve_ws_precisely(&ws, None, &[], true, false, &specs));
         let mut deps_map = HashMap::new();
         let mut res = None;
@@ -106,7 +106,7 @@ fn get_outer_crates(libname: &str, from_path: &Path, session: &Session) -> Optio
                 Ok(p) => p,
                 Err(_) => continue,
             };
-            if !toml_deps.contains(pkg.name()) {
+            if !toml_deps.contains(&pkg.name()) {
                 continue;
             }
             let targets = pkg.manifest().targets();
