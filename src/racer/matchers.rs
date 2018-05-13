@@ -170,6 +170,41 @@ pub fn match_values(
     )
 }
 
+fn strip_keyword_prefix(src: &str, keyword: &str) -> Option<Point> {
+    let mut start = 0usize;
+    if src.starts_with(keyword) {
+        // Rust added support for `pub(in codegen)`; we need to consume the visibility
+        // specifier for the rest of the code to keep working.
+        let allow_scope = keyword == "pub";
+        let mut levels = 0;
+
+        // remove whitespaces ... must have one at least AFTER the visibility restriction
+        start += keyword.len();
+        let oldstart = start;
+        for &b in src[start..].as_bytes() {
+            match b {
+                b'(' if allow_scope => {
+                    levels += 1;
+                    start += 1;
+                }
+                b')' if levels >= 1 => {
+                    levels -= 1;
+                    start += 1;
+                }
+                _ if levels >= 1 => {
+                    start += 1;
+                }
+                b' ' | b'\r' | b'\n' | b'\t' => start += 1,
+                _ => break,
+            }
+        }
+        if start != oldstart {
+            return Some(start);
+        }
+    }
+    None
+}
+
 fn find_keyword(
     src: &str,
     pattern: &str,
@@ -188,35 +223,8 @@ fn find_keyword(
 
     // optional (pub\s+)?(unsafe\s+)?
     for pat in ["pub", "unsafe"].into_iter() {
-        if src[start..].starts_with(pat) {
-            // Rust added support for `pub(in codegen)`; we need to consume the visibility
-            // specifier for the rest of the code to keep working.
-            let allow_scope = pat == &"pub";
-            let mut levels = 0;
-
-            // remove whitespaces ... must have one at least AFTER the visibility restriction
-            start += pat.len();
-            let oldstart = start;
-            for &b in src[start..].as_bytes() {
-                match b {
-                    b'(' if allow_scope => {
-                        levels += 1;
-                        start += 1;
-                    }
-                    b')' if levels >= 1 => {
-                        levels -= 1;
-                        start += 1;
-                    }
-                    _ if levels >= 1 => {
-                        start += 1;
-                    }
-                    b' ' | b'\r' | b'\n' | b'\t' => start += 1,
-                    _ => break,
-                }
-            }
-            if start == oldstart {
-                return None;
-            }
+        if let Some(prefix_len) = strip_keyword_prefix(&src[start..], pat) {
+            start += prefix_len;
         }
     }
 
@@ -510,7 +518,13 @@ pub fn match_extern_crate(
     session: &Session,
 ) -> Option<Match> {
     let mut res = None;
-    let blob = &msrc[blobstart..blobend];
+    let mut blob = &msrc[blobstart..blobend];
+
+    // Temporary fix to parse reexported crates by skipping pub
+    // keyword until racer understands crate visibility.
+    if let Some(start) = strip_keyword_prefix(blob, "pub") {
+        blob = &blob[start..];
+    }
 
     if txt_matches(search_type, &format!("extern crate {}", searchstr), blob)
         && !(txt_matches(search_type, &format!("extern crate {} as", searchstr), blob))
