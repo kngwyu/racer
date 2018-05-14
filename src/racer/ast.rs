@@ -16,32 +16,33 @@ use syntax::{self,
              codemap::{self, FileName, Span},
              visit};
 
+/// construct parser from string
 // From syntax/util/parser_testing.rs
 pub fn string_to_parser<'a>(ps: &'a ParseSess, source_str: String) -> Parser<'a> {
     parse::new_parser_from_source_str(ps, FileName::Custom("racer-file".to_owned()), source_str)
 }
 
+/// Get parser from string s and then apply closure f to it
 pub fn with_error_checking_parse<F, T>(s: String, f: F) -> Option<T>
 where
     F: FnOnce(&mut Parser) -> Option<T>,
 {
-    syntax::with_globals(|| with_error_checking_parse_(s, f))
+    syntax::with_globals(|| {
+        let codemap = Rc::new(codemap::CodeMap::new(codemap::FilePathMapping::empty()));
+        // setting of how we display errors in console
+        // here we set can_emit_warnings=false, treat_err_as_bug=false
+        let handler =
+            Handler::with_tty_emitter(ColorConfig::Never, false, false, Some(codemap.clone()));
+        let parse_sess = ParseSess::with_span_handler(handler, codemap);
+
+        let mut p = string_to_parser(&parse_sess, s);
+        f(&mut p)
+    })
 }
 
-pub fn with_error_checking_parse_<F, T>(s: String, f: F) -> Option<T>
-where
-    F: FnOnce(&mut Parser) -> Option<T>,
-{
-    let cm = Rc::new(codemap::CodeMap::new(codemap::FilePathMapping::empty()));
-    let sh = Handler::with_tty_emitter(ColorConfig::Never, false, false, Some(cm.clone()));
-    let ps = ParseSess::with_span_handler(sh, Rc::clone(&cm));
-
-    let mut p = string_to_parser(&ps, s);
-    f(&mut p)
-}
-
-// TODO: Option -> Result
-pub fn with_stmt(source_str: String, f: impl FnOnce(&ast::Stmt)) -> Option<()> {
+/// parse string s as statement and then apply f to it
+/// return false if we can't parse s as statement
+pub fn with_stmt(source_str: String, f: impl FnOnce(&ast::Stmt)) -> bool {
     with_error_checking_parse(source_str, |p| {
         let stmt = match p.parse_stmt() {
             Ok(Some(stmt)) => stmt,
@@ -49,7 +50,7 @@ pub fn with_stmt(source_str: String, f: impl FnOnce(&ast::Stmt)) -> Option<()> {
         };
         f(&stmt);
         Some(())
-    })
+    }).is_some()
 }
 
 fn destruct_span(span: Span) -> (u32, u32) {
