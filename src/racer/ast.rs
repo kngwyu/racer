@@ -6,15 +6,16 @@ use typeinf;
 use std::path::Path;
 use std::rc::Rc;
 
-use syntax::ast::{self, ExprKind, FunctionRetTy, GenericParam, Generics, ItemKind, LitKind,
-                  PatKind, TyKind, TyParamBound, TyParamBounds, UseTree, UseTreeKind};
+use syntax::ast::{
+    self, ExprKind, FunctionRetTy, GenericParam, Generics, ItemKind, LitKind, PatKind, TyKind,
+    TyParamBound, TyParamBounds, UseTree, UseTreeKind,
+};
+use syntax::codemap::{self, FileName, Span};
 use syntax::errors::{emitter::ColorConfig, Handler};
 use syntax::parse::parser::Parser;
 use syntax::parse::{self, ParseSess};
 use syntax::print::pprust;
-use syntax::{self,
-             codemap::{self, FileName, Span},
-             visit};
+use syntax::{self, symbol, visit};
 
 /// construct parser from string
 // From syntax/util/parser_testing.rs
@@ -478,10 +479,9 @@ fn to_racer_path(path: &ast::Path) -> core::Path {
     let mut v = Vec::new();
     let mut global = false;
     for seg in &path.segments {
-        let name = seg.ident.name.to_string();
+        let name = seg.ident.name;
         let mut types = Vec::new();
-        // TODO: this is for backword compatibility & maybe we have to rewrite core::Path
-        if name == "{{root}}" {
+        if name == symbol::keywords::CrateRoot.name() {
             global = true;
             continue;
         }
@@ -499,7 +499,7 @@ fn to_racer_path(path: &ast::Path) -> core::Path {
             });
         }
         v.push(core::PathSegment {
-            name: name,
+            name: name.to_string(),
             types: types,
         });
     }
