@@ -1,3 +1,4 @@
+//! system test utilities for racer
 extern crate racer;
 extern crate tempfile;
 use racer::{complete_from_file, find_definition, Match, Point};
@@ -8,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use tempfile::{Builder, NamedTempFile, TempDir};
 
+/// name temp file
 pub fn tmpname() -> String {
     let thread = thread::current();
     let taskname = thread.name().unwrap();
@@ -15,7 +17,7 @@ pub fn tmpname() -> String {
     format!("racer-{}", taskname)
 }
 
-/// Utility wrapper for NamedTempfile
+/// Wrapper of NamedTempfile
 pub struct TmpFile {
     inner: NamedTempFile,
 }
@@ -50,10 +52,10 @@ impl AsRef<Path> for TmpFile {
     }
 }
 
-/// Utility wrapper for TempDir
+/// Wrapper for TempDir
 pub enum TmpDir {
     Tmp(TempDir),
-    Real(PathBuf),
+    Path(PathBuf),
 }
 
 impl TmpDir {
@@ -69,7 +71,7 @@ impl TmpDir {
         let path = self.path();
         let new_path = path.join(dir_name);
         if new_path.exists() {
-            TmpDir::Real(new_path)
+            TmpDir::Path(new_path)
         } else {
             let dir = Builder::new()
                 .prefix(&dir_name)
@@ -94,7 +96,7 @@ impl TmpDir {
     pub fn path(&self) -> &Path {
         match self {
             TmpDir::Tmp(dir) => dir.path(),
-            TmpDir::Real(buf) => buf,
+            TmpDir::Path(buf) => buf,
         }
     }
 }
@@ -115,6 +117,7 @@ impl fmt::Debug for TmpDir {
 pub fn setup_test_project() -> TmpDir {
     let tmp_dir = TmpDir::new();
     let test_project = Path::new(env!("CARGO_MANIFEST_DIR")).join("test_project");
+    // copy test project to temp dir recursively
     fn copy_dirs(abs_path: &Path, tmp_path: &Path) -> io::Result<()> {
         if !abs_path.is_dir() {
             return Ok(());
@@ -145,6 +148,7 @@ pub fn setup_test_project() -> TmpDir {
     tmp_dir
 }
 
+/// get position where you want to test completion and source code
 pub fn get_pos_and_source(src: &str) -> (Point, String) {
     let point = src.find('~').unwrap();
     (point, src.replace('~', ""))
