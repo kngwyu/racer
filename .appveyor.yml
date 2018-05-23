@@ -1,6 +1,6 @@
 # Based on https://github.com/japaric/rust-everywhere/blob/master/appveyor.yml
 environment:
-  RUSTUP_USE_HYPER: 1
+  RUSTUP_USE_REQWEST: 1
   CARGO_HTTP_CHECK_REVOKE: false
   matrix:
     # Stable channel
@@ -41,6 +41,8 @@ install:
   - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
   # for msys2, we have to add another path
   - if defined MSYS2_BITS set PATH=%PATH%;C:\msys64\mingw%MSYS2_BITS%\bin
+  - ps: dir C:\msys64\mingw32\bin
+  - ps: dir C:\msys64\mingw64\bin
   # the rust-src is needed for tests that depend on the standard library
   - rustup component add rust-src
   - set RUST_SRC_PATH=C:\Users\appveyor\.rustup\toolchains\%CHANNEL%-%TARGET%\lib\rustlib\src\rust\src
