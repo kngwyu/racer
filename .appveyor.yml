@@ -43,6 +43,14 @@ install:
   - if defined MSYS2_BITS set PATH=%PATH%;C:\msys64\mingw%MSYS2_BITS%\bin
   - ps: dir C:\msys64\mingw32\bin
   - ps: dir C:\msys64\mingw64\bin
+  - ps: echo $Env:PATH
+  - ps: >-
+      If ($Env:TARGET -eq 'x86_64-pc-windows-gnu') {
+      $Env:PATH += ';C:\msys64\mingw64\bin'
+      } ElseIf ($Env:TARGET -eq 'i686-pc-windows-gnu') {
+        $Env:PATH += ';C:\msys64\mingw32\bin'
+      }
+  - ps: echo $Env:PATH
   # the rust-src is needed for tests that depend on the standard library
   - rustup component add rust-src
   - set RUST_SRC_PATH=C:\Users\appveyor\.rustup\toolchains\%CHANNEL%-%TARGET%\lib\rustlib\src\rust\src
