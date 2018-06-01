@@ -4,6 +4,9 @@
 
 `rustc-ap-syntax` version of [racer](https://github.com/racer-rust/racer) for nightly Rust, based on https://github.com/racer-rust/racer/commit/86be1103e804bae2d0c324a94984abe3e12a3db5
 
+# Warning
+Now I'm applying many changes in this branch to upstream and this branch is no longer maintainanced(but still exists for personal exprimants). So please use upstream branch.
+
 ## status
 - [x] [#826](https://github.com/racer-rust/racer/issues/826)
 - [x] [#785](https://github.com/racer-rust/racer/issues/785)
@@ -19,14 +22,5 @@
 - [ ] complete `try_trait` support
 - [ ] more precise research flag(e.g. `extern crate` in outer crates is not a module)
 
-## install
-Now I'm completely not sure I should merge this branch to upstream or not, so this branch is not available in crate.io for a while.
 
-To install manually,
-``` bash
-rustup update nightly
-git clone https://github.com/kngwyu/racer-nightly.git
-cd racer-nightly
-cargo +nightly install --path . -f
-```
 
