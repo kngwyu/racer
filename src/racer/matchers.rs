@@ -21,6 +21,14 @@ pub struct PendingImport<'fp> {
 /// A stack of imports (`use` items) currently being resolved.
 pub type PendingImports<'stack, 'fp> = StackLinkedListNode<'stack, PendingImport<'fp>>;
 
+/// a context where matching a word
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MatchCxt<'s> {
+    start: Point,
+    end: Point,
+    search_str: &'s str,
+}
+
 pub fn match_types(src: Src, blobstart: Point, blobend: Point,
                    searchstr: &str, filepath: &Path,
                    search_type: SearchType,

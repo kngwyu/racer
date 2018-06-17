@@ -3,7 +3,7 @@ use std::{cmp, error, fmt, path};
 use std::rc::Rc;
 use std::{collections::hash_map::DefaultHasher, hash::{Hash, Hasher}};
 
-use core::{IndexedSource, Session, SessionExt, Location, LocationExt, Point};
+use core::{IndexedSource, Session, SessionExt, Location, LocationExt, BytePoint};
 use core::SearchType::{self, ExactMatch, StartsWith};
 
 #[cfg(unix)]
@@ -182,8 +182,8 @@ pub fn expand_ident<P, C>(
         // TODO: Would this better be an assertion ? Why are out-of-bound values getting here ?
         // They are coming from the command-line, question is, if they should be handled beforehand
         // clamp pos into allowed range
-        let pos = cmp::min(s.len(), pos);
-        let sb = &s[..pos];
+        let pos = cmp::min(s.len().into(), pos);
+        let sb = &s[..pos.0];
         let mut start = pos;
 
         // backtrack to find start of word
@@ -191,7 +191,7 @@ pub fn expand_ident<P, C>(
             if !is_ident_char(c) {
                 break;
             }
-            start = i;
+            start = i.into();
         }
 
         (start, pos)
@@ -206,33 +206,33 @@ pub fn expand_ident<P, C>(
 
 pub struct ExpandedIdent {
     src: Rc<IndexedSource>,
-    start: Point,
-    pos: Point,
+    start: BytePoint,
+    pos: BytePoint,
 }
 
 impl ExpandedIdent {
     pub fn ident(&self) -> &str {
-        &self.src.code[self.start..self.pos]
+        &self.src.code[self.start.0..self.pos.0]
     }
 
-    pub fn start(&self) -> Point {
+    pub fn start(&self) -> BytePoint {
         self.start
     }
 
-    pub fn pos(&self) -> Point {
+    pub fn pos(&self) -> BytePoint {
         self.pos
     }
 }
 
-pub fn find_ident_end(s: &str, pos: Point) -> Point {
+pub fn find_ident_end(s: &str, pos: BytePoint) -> BytePoint {
     // find end of word
-    let sa = &s[pos..];
+    let sa = &s[pos.0..];
     for (i, c) in sa.char_indices() {
         if !is_ident_char(c) {
-            return pos + i;
+            return pos + i.into();
         }
     }
-    s.len()
+    s.len().into()
 }
 
 #[test]

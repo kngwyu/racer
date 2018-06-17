@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use {core, ast, matchers, scopes, typeinf};
 use core::SearchType::{self, ExactMatch, StartsWith};
-use core::{Match, Src, Session, Coordinate, SessionExt, Ty, Point};
+use core::{Match, Src, Session, Coordinate, SessionExt, Ty, BytePoint};
 use core::MatchType::{Module, Function, Struct, Enum, EnumVariant, FnArg, Trait, StructField,
     Impl, TraitImpl, MatchArm, Builtin, TypeParameter};
 use core::Namespace;
@@ -26,7 +26,7 @@ fn search_struct_fields(searchstr: &str, structmatch: &Match,
                         search_type: SearchType, session: &Session) -> vec::IntoIter<Match> {
     let src = session.load_file(&structmatch.filepath);
     let struct_start = scopes::expect_stmt_start(src.as_src(), structmatch.point);
-    let structsrc = scopes::end_of_next_scope(&src[struct_start..]);
+    let structsrc = scopes::end_of_next_scope(&src[struct_start.0..]);
 
     let fields = ast::parse_struct_fields(structsrc.to_owned(),
                                           core::Scope::from_match(structmatch));
@@ -57,11 +57,15 @@ fn search_struct_fields(searchstr: &str, structmatch: &Match,
     out.into_iter()
 }
 
-pub fn search_for_impl_methods(match_request: &Match,
-                           fieldsearchstr: &str, point: Point,
-                           fpath: &Path, local: bool,
-                           search_type: SearchType,
-                               session: &Session) -> vec::IntoIter<Match> {
+pub fn search_for_impl_methods(
+    match_request: &Match,
+    fieldsearchstr: &str,
+    point: BytePoint,
+    fpath: &Path,
+    local: bool,
+    search_type: SearchType,
+    session: &Session
+) -> vec::IntoIter<Match> {
 
     let implsearchstr: &str = &match_request.matchstr;
 
@@ -79,8 +83,8 @@ pub fn search_for_impl_methods(match_request: &Match,
         let src = session.load_file(&m.filepath);
 
         // find the opening brace and skip to it.
-        if let Some(n) = src[m.point..].find('{') {
-            let point = m.point + n + 1;
+        if let Some(n) = src[m.point.0..].find('{') {
+            let point = m.point.increment() + n.into();
             for m in search_scope_for_methods(point, src.as_src(), fieldsearchstr, &m.filepath, search_type) {
                 out.push(m);
             }
@@ -89,8 +93,8 @@ pub fn search_for_impl_methods(match_request: &Match,
             debug!("found generic impl!! {:?}", gen_m);
             let src = session.load_file(&gen_m.filepath);
             // find the opening brace and skip to it.
-            if let Some(n) = src[gen_m.point..].find('{') {
-                let point = gen_m.point + n + 1;
+            if let Some(n) = src[gen_m.point.0..].find('{') {
+                let point = gen_m.point.increment() + n.into();
                 for gen_method in search_generic_impl_scope_for_methods(point, src.as_src(),
                                                                         fieldsearchstr, &gen_m, search_type) {
                     out.push(gen_method);
@@ -107,8 +111,8 @@ pub fn search_for_impl_methods(match_request: &Match,
                     debug!("found generic impl!! {:?}", m);
                     let src = session.load_file(&m.filepath);
                     // find the opening brace and skip to it.
-                    if let Some(n) = src[m.point..].find('{') {
-                        let point = m.point + n + 1;
+                    if let Some(n) = src[m.point.0..].find('{') {
+                        let point = m.point.increment() + n.into();
                         for m in search_generic_impl_scope_for_methods(point, src.as_src(), fieldsearchstr, &m, search_type) {
                             out.push(m);
                         }
@@ -120,36 +124,36 @@ pub fn search_for_impl_methods(match_request: &Match,
     out.into_iter()
 }
 
-fn search_scope_for_methods(point: Point, src: Src, searchstr: &str, filepath: &Path,
+fn search_scope_for_methods(point: BytePoint, src: Src, searchstr: &str, filepath: &Path,
                             search_type: SearchType) -> vec::IntoIter<Match> {
-    debug!("searching scope for methods {} |{}| {:?}", point, searchstr, filepath.display());
+    debug!("searching scope for methods {:?} |{}| {:?}", point, searchstr, filepath.display());
 
-    let scopesrc = src.from(point);
+    let scopesrc = src.shift_start(point);
     let mut out = Vec::new();
-    for (blobstart,blobend) in scopesrc.iter_stmts() {
-        let blob = &scopesrc[blobstart..blobend];
+    for blob_range in scopesrc.iter_stmts() {
+        let blob = &scopesrc[blob_range.to_range()];
         if let Some(n) = blob.find(|c| {c == '{' || c == ';'}) {
             let signature = blob[..n].trim_right();
 
             if txt_matches(search_type, &format!("fn {}", searchstr), signature)
                 && typeinf::first_param_is_self(blob) {
                 debug!("found a method starting |{}| |{}|", searchstr, blob);
-                // TODO: parse this properly
-                let start = blob.find(&format!("fn {}", searchstr)).unwrap() + 3;
+                // TODO: parse this properly, or, txt_matches should return match pos?
+                let start = BytePoint::from(blob.find(&format!("fn {}", searchstr)).unwrap() + 3);
                 let end = find_ident_end(blob, start);
-                let l = &blob[start..end];
+                let l = &blob[start.0..end.0];
                 // TODO: make a better context string for functions
                 let m = Match {
                            matchstr: l.to_owned(),
                            filepath: filepath.to_path_buf(),
-                           point: point + blobstart + start,
+                           point: point + blob_range.start + start,
                            coords: None,
                            local: true,
                            mtype: Function,
                            contextstr: signature.to_owned(),
                            generic_args: Vec::new(),
                            generic_types: Vec::new(),
-                           docs: find_doc(&scopesrc, blobstart + start),
+                           docs: find_doc(&scopesrc, blob_range.start + start),
                 };
                 out.push(m);
             }
@@ -158,36 +162,36 @@ fn search_scope_for_methods(point: Point, src: Src, searchstr: &str, filepath: &
     out.into_iter()
 }
 
-fn search_generic_impl_scope_for_methods(point: Point, src: Src, searchstr: &str, contextm: &Match,
+fn search_generic_impl_scope_for_methods(point: BytePoint, src: Src, searchstr: &str, contextm: &Match,
                             search_type: SearchType) -> vec::IntoIter<Match> {
-    debug!("searching generic impl scope for methods {} |{}| {:?}", point, searchstr, contextm.filepath.display());
+    debug!("searching generic impl scope for methods {:?} |{}| {:?}", point, searchstr, contextm.filepath.display());
 
-    let scopesrc = src.from(point);
+    let scopesrc = src.shift_start(point);
     let mut out = Vec::new();
-    for (blobstart,blobend) in scopesrc.iter_stmts() {
-        let blob = &scopesrc[blobstart..blobend];
+    for blob_range in scopesrc.iter_stmts() {
+        let blob = &scopesrc[blob_range.to_range()];
         if let Some(n) = blob.find(|c| {c == '{' || c == ';'}) {
             let signature = blob[..n].trim_right();
 
             if txt_matches(search_type, &format!("fn {}", searchstr), signature)
                 && typeinf::first_param_is_self(blob) {
                 debug!("found a method starting |{}| |{}|", searchstr, blob);
-                // TODO: parse this properly
-                let start = blob.find(&format!("fn {}", searchstr)).unwrap() + 3;
+                 // TODO: parse this properly, or, txt_matches should return match pos?
+                let start = BytePoint::from(blob.find(&format!("fn {}", searchstr)).unwrap() + 3);
                 let end = find_ident_end(blob, start);
-                let l = &blob[start..end];
+                let l = &blob[start.0..end.0];
                 // TODO: make a better context string for functions
                 let m = Match {
                            matchstr: l.to_owned(),
                            filepath: contextm.filepath.clone(),
-                           point: point + blobstart + start,
+                           point: point + blob_range.start + start,
                            coords: None,
                            local: true,
                            mtype: Function,
                            contextstr: signature.to_owned(),
                            generic_args: contextm.generic_args.clone(),  // Attach impl generic args
                            generic_types: contextm.generic_types.clone(), // Attach impl generic types
-                           docs: find_doc(&scopesrc, blobstart + start),
+                           docs: find_doc(&scopesrc, blob_range.start + start),
                 };
                 out.push(m);
             }
@@ -198,14 +202,14 @@ fn search_generic_impl_scope_for_methods(point: Point, src: Src, searchstr: &str
 
 /// Look for static trait functions. This fn doesn't search for _method_ declarations
 /// or implementations as `search_scope_for_methods` already handles that.
-fn search_scope_for_static_trait_fns(point: Point, src: Src, searchstr: &str, filepath: &Path,
+fn search_scope_for_static_trait_fns(point: BytePoint, src: Src, searchstr: &str, filepath: &Path,
                             search_type: SearchType) -> vec::IntoIter<Match> {
-    debug!("searching scope for trait fn declarations {} |{}| {:?}", point, searchstr, filepath.display());
+    debug!("searching scope for trait fn declarations {:?} |{}| {:?}", point, searchstr, filepath.display());
 
-    let scopesrc = src.from(point);
+    let scopesrc = src.shift_start(point);
     let mut out = Vec::new();
-    for (blobstart,blobend) in scopesrc.iter_stmts() {
-        let blob = &scopesrc[blobstart..blobend];
+    for blob_range in scopesrc.iter_stmts() {
+        let blob = &scopesrc[blob_range.to_range()];
         if let Some(n) = blob.find(|c| c == '{' || c == ';') {
             let signature = blob[..n].trim_right();
 
@@ -215,21 +219,22 @@ fn search_scope_for_static_trait_fns(point: Point, src: Src, searchstr: &str, fi
                 && !typeinf::first_param_is_self(blob) {
                 debug!("found a method starting |{}| |{}|", searchstr, blob);
                 // TODO: parse this properly
-                let start = blob.find(&format!("fn {}", searchstr)).unwrap() + 3;
+                 // TODO: parse this properly, or, txt_matches should return match pos?
+                let start = BytePoint::from(blob.find(&format!("fn {}", searchstr)).unwrap() + 3);
                 let end = find_ident_end(blob, start);
-                let l = &blob[start..end];
+                let l = &blob[start.0..end.0];
                 // TODO: make a better context string for functions
                 let m = Match {
                            matchstr: l.to_owned(),
                            filepath: filepath.to_path_buf(),
-                           point: point + blobstart + start,
+                           point: point + blob_range.start + start,
                            coords: None,
                            local: true,
                            mtype: Function,
                            contextstr: signature.to_owned(),
                            generic_args: Vec::new(),
                            generic_types: Vec::new(),
-                           docs: find_doc(&scopesrc, blobstart + start),
+                           docs: find_doc(&scopesrc, blob_range.start + start),
                 };
                 out.push(m);
             }
@@ -239,16 +244,16 @@ fn search_scope_for_static_trait_fns(point: Point, src: Src, searchstr: &str, fi
 }
 
 
-pub fn search_for_impls(pos: Point, searchstr: &str, filepath: &Path, local: bool, include_traits: bool,
+pub fn search_for_impls(pos: BytePoint, searchstr: &str, filepath: &Path, local: bool, include_traits: bool,
                         session: &Session, pending_imports: &PendingImports) -> vec::IntoIter<Match> {
-    debug!("search_for_impls {}, {}, {:?}", pos, searchstr, filepath.display());
+    debug!("search_for_impls {:?}, {}, {:?}", pos, searchstr, filepath.display());
     let s = session.load_file(filepath);
     let scope_start = scopes::scope_start(s.as_src(), pos);
-    let src = s.from(scope_start);
+    let src = s.src_from_start(scope_start);
 
     let mut out = Vec::new();
-    for (start, end) in src.iter_stmts() {
-        let blob = &src[start..end];
+    for blob_range in src.iter_stmts() {
+        let blob = &src[blob_range.to_range()];
 
         if blob.starts_with("impl") {
             blob.find('{').map(|n| {
