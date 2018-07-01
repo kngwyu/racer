@@ -1,13 +1,14 @@
 //! Name resolving
 
 use std::{self, vec};
-use std::collections::HashSet;
+use std::cell::RefCell;
+use std::collections::{hash_map, HashMap, HashSet};
 use std::rc::Rc;
 use std::path::{Path, PathBuf};
 
 use {core, ast, matchers, scopes, typeinf};
 use core::SearchType::{self, ExactMatch, StartsWith};
-use core::{Match, Src, Session, Coordinate, SessionExt, Ty, BytePos, ByteRange};
+use core::{Match, Src, Session, Coordinate, SessionExt, Ty, BytePos, ByteRange, ResolveKey};
 use core::MatchType::{Module, Function, Struct, Enum, EnumVariant, FnArg, Trait, StructField,
     Impl, TraitImpl, MatchArm, Builtin, TypeParameter};
 use core::Namespace;
@@ -1321,7 +1322,7 @@ pub fn resolve_name(
     namespace: Namespace,
     session: &Session,
     import_info: &ImportInfo,
-) -> vec::IntoIter<Match> {
+) -> Vec<Match> {
     let mut out = Vec::new();
     let searchstr = &pathseg.name;
 
@@ -1354,7 +1355,7 @@ pub fn resolve_name(
 
         if let ExactMatch = search_type {
             if !out.is_empty() {
-                return out.into_iter();
+                return out;
             }
         }
     }
@@ -1362,30 +1363,28 @@ pub fn resolve_name(
     for m in search_local_scopes(pathseg, filepath, msrc.as_src(), pos, search_type, namespace, session, import_info) {
         out.push(m);
         if let ExactMatch = search_type {
-            return out.into_iter();
+            return out;
         }
     }
 
     for m in search_crate_root(pathseg, filepath, search_type, namespace, session, import_info) {
         out.push(m);
         if let ExactMatch = search_type {
-            return out.into_iter();
+            return out;
         }
     }
 
     for m in search_prelude_file(pathseg, search_type, namespace, session, import_info) {
         out.push(m);
         if let ExactMatch = search_type {
-            return out.into_iter();
+            return out;
         }
     }
     // filesearch. Used to complete e.g. extern crate blah or mod foo
     if let StartsWith = search_type {
-        for m in do_file_search(searchstr, filepath.parent().unwrap(), session) {
-            out.push(m);
-        }
+        out.extend(do_file_search(searchstr, filepath.parent().unwrap(), session));
     }
-    out.into_iter()
+    out
 }
 
 // Get the scope corresponding to super::
@@ -1434,37 +1433,85 @@ pub fn resolve_path(
     session: &Session,
     import_info: &ImportInfo,
 ) -> vec::IntoIter<Match> {
-    debug!("resolve_path {:?} {:?} {:?} {:?}", path, filepath.display(), pos, search_type);
+    let key = if !path.segments.is_empty() && path.segments[0].name == "self"{
+        let new_path = path.without_front();
+        ResolveKey::new(new_path, filepath, pos, search_type)
+    } else {
+        ResolveKey::new(path.clone(), filepath, pos, search_type)
+    };
+    let mut out = Vec::new();
+    let get_cache = |map: &RefCell<HashMap<ResolveKey, Vec<Match>>>, namespace| {
+        if let Some(vec) = map.borrow().get(&key) {
+            vec.clone()
+        } else {
+            let res = resolve_path_impl(
+                path,
+                filepath,
+                pos,
+                search_type,
+                namespace,
+                session,
+                import_info
+            );
+            map.borrow_mut().insert(key.clone(), res.clone());
+            res
+        }
+    };
+    match namespace {
+        Namespace::Type => {
+            out.extend(get_cache(&session.resolved_types, Namespace::Type));
+        }
+        Namespace::Value => {
+            out.extend(get_cache(&session.resolved_values, Namespace::Value));
+        }
+        Namespace::Both => {
+            out.extend(get_cache(&session.resolved_types, Namespace::Type));
+            out.extend(get_cache(&session.resolved_values, Namespace::Both));
+        }
+    }
+    out.into_iter()
+}
+
+
+fn resolve_path_impl(
+    path: &core::Path,
+    filepath: &Path,
+    pos: BytePos,
+    search_type: SearchType,
+    namespace: Namespace,
+    session: &Session,
+    import_info: &ImportInfo,
+) -> Vec<Match> {
+    debug!("resolve_path_impl {:?} {:?} {:?} {:?}", path, filepath.display(), pos, search_type);
     let len = path.segments.len();
     if len == 1 {
         let pathseg = &path.segments[0];
         resolve_name(pathseg, filepath, pos, search_type, namespace, session, import_info)
     } else if len != 0 {
-        if path.segments[0].name == "self" {
-            // just remove self
-            let mut newpath: core::Path = path.clone();
-            newpath.segments.remove(0);
-            return resolve_path(&newpath, filepath, pos, search_type, namespace, session, import_info);
-        }
-
         if path.segments[0].name == "super" {
             if let Some(scope) = get_super_scope(filepath, pos, session, import_info) {
                 debug!("PHIL super scope is {:?}", scope);
 
-                let mut newpath: core::Path = path.clone();
-                newpath.segments.remove(0);
-                return resolve_path(&newpath, &scope.filepath,
-                                    scope.point, search_type, namespace, session, import_info);
+                let newpath = path.without_front();
+                return resolve_path(
+                    &newpath,
+                    &scope.filepath,
+                    scope.point,
+                    search_type,
+                    namespace,
+                    session,
+                    import_info
+                ).collect();
             } else {
                 // can't find super scope. Return no matches
                 debug!("can't resolve path {:?}, returning no matches", path);
-                return Vec::new().into_iter();
+                return Vec::new();
             }
         }
 
         let mut out = Vec::new();
         let mut parent_path: core::Path = path.clone();
-        parent_path.segments.remove(len-1);
+        parent_path.segments.pop();
         let context = resolve_path(&parent_path, filepath, pos, ExactMatch, Namespace::Type, session, import_info).nth(0);
         context.map(|m| {
             match m.mtype {
@@ -1608,11 +1655,11 @@ pub fn resolve_path(
             }
         });
         debug!("resolve_path returning {:?}", out);
-        out.into_iter()
+        out
     } else {
         // TODO: Should this better be an assertion ? Why do we have a core::Path
         // with empty segments in the first place ?
-        Vec::new().into_iter()
+        Vec::new()
     }
 }
 

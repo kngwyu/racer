@@ -1,4 +1,4 @@
-use cargo::core::Resolve;
+use cargo::core::Resolve as CargoResolve;
 use rls_span;
 use syntax::codemap;
 use std::fs::File;
@@ -63,14 +63,13 @@ impl fmt::Display for MatchType {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SearchType {
     ExactMatch,
     StartsWith
 }
 
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Namespace {
     Type,
     Value,
@@ -362,7 +361,7 @@ impl fmt::Display for Ty {
 }
 
 // The racer implementation of an ast::Path. Difference is that it is Send-able
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Path {
     pub global: bool,
     pub segments: Vec<PathSegment>
@@ -392,6 +391,13 @@ impl Path {
     pub fn extend(&mut self, path: Path) -> &mut Self {
         self.segments.extend(path.segments);
         self
+    }
+
+    pub fn without_front(&self) -> Self {
+        Path {
+            global: self.global,
+            segments: Vec::from(&self.segments[1..]),
+        }
     }
 }
 
@@ -454,7 +460,7 @@ impl fmt::Display for Path {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PathSegment {
     pub name: String,
     pub types: Vec<Path>
@@ -865,6 +871,31 @@ impl Dependencies {
     }
 }
 
+// TODO: remove SearchType
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct ResolveKey {
+    path: Path,
+    filepath: path::PathBuf,
+    pos: BytePos,
+    search_type: SearchType,
+}
+
+impl ResolveKey {
+    pub fn new(
+        path: Path,
+        filepath: &path::Path,
+        pos: BytePos,
+        search_type: SearchType,
+    ) -> Self {
+        ResolveKey {
+            path: path,
+            filepath: filepath.to_owned(),
+            pos,
+            search_type,
+        }
+    }
+}
+
 /// Context for a Racer operation
 pub struct Session<'c> {
     /// Cache for files
@@ -873,13 +904,16 @@ pub struct Session<'c> {
     /// borrowed here in order to support reuse across Racer operations.
     cache: &'c FileCache,
     /// Cache for generic impls
-    pub generic_impls: RefCell<HashMap<(path::PathBuf, BytePos),
+    pub(crate) generic_impls: RefCell<HashMap<(path::PathBuf, BytePos),
                                        Rc<Vec<(BytePos, String,
                                                ast::GenericsArgs, ast::ImplVisitor)>>>>,
+    /// Cache for resolve_path
+    pub(crate) resolved_types: RefCell<HashMap<ResolveKey, Vec<Match>>>,
+    pub(crate) resolved_values: RefCell<HashMap<ResolveKey, Vec<Match>>>,
     /// Cached dependencie (path to Cargo.toml -> Depedencies)
     cached_deps: RefCell<HashMap<path::PathBuf, Rc<Dependencies>>>,
     /// Cached lockfiles (path to Cargo.lock -> Resolve)
-    cached_lockfile: RefCell<HashMap<path::PathBuf, Rc<Resolve>>>,
+    cached_lockfile: RefCell<HashMap<path::PathBuf, Rc<CargoResolve>>>,
 }
 
 impl<'c> fmt::Debug for Session<'c> {
@@ -908,6 +942,8 @@ impl<'c> Session<'c> {
         Session {
             cache,
             generic_impls: Default::default(),
+            resolved_types: Default::default(),
+            resolved_values: Default::default(),
             cached_deps: Default::default(),
             cached_lockfile: Default::default(),
         }
@@ -963,10 +999,10 @@ impl<'c> Session<'c> {
 
     /// load `Cargo.lock` file using fileloader
     // TODO: use result
-    pub(crate) fn load_lockfile<P, F>(&self, path: P, resolver: F) -> Option<Rc<Resolve>>
+    pub(crate) fn load_lockfile<P, F>(&self, path: P, resolver: F) -> Option<Rc<CargoResolve>>
     where
         P: AsRef<path::Path>,
-        F: FnOnce(&str) -> Option<Resolve>
+        F: FnOnce(&str) -> Option<CargoResolve>
     {
         let pathbuf = path.as_ref().to_owned();
         match self.cached_lockfile.borrow_mut().entry(pathbuf) {

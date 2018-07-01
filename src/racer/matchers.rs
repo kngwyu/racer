@@ -656,7 +656,8 @@ pub fn match_use(
                     name: context.search_str.to_owned(),
                     types: vec![],
                 });
-                import_info.skip_glob = true;
+                let search_path_c = search_path.clone();
+                import_info.skip_glob = false;
                 let mut path_iter = resolve_path(
                     &search_path,
                     context.filepath,
@@ -671,6 +672,7 @@ pub fn match_use(
                     "[match_use] resolve_path returned {:?} for Glob",
                     path_iter,
                 );
+                println!("{:?}, {:?}", search_path_c, path_iter);
                 out.extend(path_iter);
             }
         }

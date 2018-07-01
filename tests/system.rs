@@ -1975,6 +1975,8 @@ fn finds_glob_imported_enum_variant() {
 fn finds_enum_variant_through_recursive_glob_imports() {
     let src = "
     use foo::*;
+    use hoge::*;
+    use huga::*;
     use Bar::*;
 
     mod foo {
