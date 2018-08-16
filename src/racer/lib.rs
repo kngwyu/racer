@@ -1,4 +1,5 @@
 #![cfg_attr(feature = "nightly", feature(test))]
+#![feature(crate_visibility_modifier)]
 
 #[macro_use]
 extern crate log;

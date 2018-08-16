@@ -3,7 +3,7 @@ use std::{cmp, error, fmt, path};
 use std::rc::Rc;
 use std::{collections::hash_map::DefaultHasher, hash::{Hash, Hasher}};
 
-use core::{IndexedSource, Session, SessionExt, Location, LocationExt, BytePos, ByteRange};
+use core::{IndexedSource, Session, SessionExt, Location, LocationExt, BytePos, ByteRange, Visibility};
 use core::SearchType::{self, ExactMatch, StartsWith};
 
 #[cfg(unix)]
@@ -589,20 +589,27 @@ impl<'stack, T: PartialEq> StackLinkedListNode<'stack, T> {
     }
 }
 
-// don't use other than strip_visibilities or strip_unsafe
-fn strip_word_impl(src: &str, allow_paren: bool) -> Option<BytePos> {
+// don't use other than strip_visibility or strip_unsafe
+fn strip_word_impl(src: &str, allow_paren: bool) -> Option<(BytePos, Option<ByteRange>)> {
     let mut level = 0;
-     for (i, &b) in src.as_bytes().into_iter().enumerate() {
+    let mut in_paren = None;
+    for (i, &b) in src.as_bytes().into_iter().enumerate() {
         match b {
-            b'(' if allow_paren => level += 1,
-            b')' if allow_paren => level -= 1,
+            b'(' if allow_paren => {
+                level += 1;
+                in_paren = Some(ByteRange::new(i, 0));
+            }
+            b')' if allow_paren => {
+                level -= 1;
+                in_paren.map(|b| b.end = BytePos(i).increment());
+            }
             _ if level >= 1 => (),
             // stop on the first thing that isn't whitespace
             _ if !is_whitespace_byte(b) => {
                 if i == 0 {
                     break;
                 }
-                return Some(BytePos(i));
+                return Some((BytePos(i), in_paren));
             },
             _ => continue,
         }
@@ -611,11 +618,18 @@ fn strip_word_impl(src: &str, allow_paren: bool) -> Option<BytePos> {
 }
 
 /// remove pub(crate), crate
-pub(crate) fn strip_visivility(src: &str) -> Option<BytePos> {
+pub(crate) fn strip_visivility(src: &str) -> Option<(BytePos, Visibility)> {
     if src.starts_with("pub") {
-        Some(strip_word_impl(&src[3..], true)? + BytePos(3))
+        let (pos, in_paren) = strip_word_impl(&src[3..], true)?;
+        let vis = if let Some(range) = in_paren {
+            Visibility::Public
+        } else {
+            Visibility::Public
+        };
+        Some((pos + BytePos(3), vis))
     } else if src.starts_with("crate") {
-        Some(strip_word_impl(&src[5..], false)? + BytePos(5))
+        let (pos, _) = strip_word_impl(&src[5..], false)?;
+        Some((pos + BytePos(5), Visibility::Crate))
     } else {
         None
     }
@@ -625,7 +639,7 @@ pub(crate) fn strip_visivility(src: &str) -> Option<BytePos> {
 pub(crate) fn strip_word(src: &str, word: &str) -> Option<BytePos> {
     if src.starts_with(word) {
         let len = word.len();
-        Some(strip_word_impl(&src[len..], false)? + BytePos(len))
+        Some(strip_word_impl(&src[len..], false)?.0 + BytePos(len))
     } else {
         None
     }
@@ -652,7 +666,7 @@ fn test_strip_words() {
 /// can assess the struct/trait/fn without worrying about restricted
 /// visibility.
 pub(crate) fn trim_visibility(blob: &str) -> &str {
-    if let Some(start) = strip_visivility(blob) {
+    if let Some((start, _)) = strip_visivility(blob) {
         &blob[start.0..]
     } else {
         blob

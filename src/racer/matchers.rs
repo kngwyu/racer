@@ -6,7 +6,7 @@ use nameres::resolve_path;
 use core::SearchType::{self, StartsWith, ExactMatch};
 use core::MatchType::{self, Let, Module, Function, Struct, Type, Trait, Enum, EnumVariant,
                       Const, Static, IfLet, WhileLet, For, Macro};
-use core::Namespace;
+use core::{self, Namespace, Visibility};
 use std::path::Path;
 use std::{str, vec};
 
@@ -39,13 +39,13 @@ impl<'stack, 'fp: 'stack> Default for ImportInfo<'stack, 'fp> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MatchCxt<'s, 'p> {
     pub filepath: &'p Path,
     pub search_str: &'s str,
     pub range: ByteRange,
     pub search_type: SearchType,
-    pub is_local: bool,
+    pub from_path: Option<core::Path>,
 }
 
 impl<'s, 'p> MatchCxt<'s, 'p> {
@@ -54,7 +54,7 @@ impl<'s, 'p> MatchCxt<'s, 'p> {
         blob: &str,
         keyword: &str,
         ignore: &[&str],
-    ) -> Option<(BytePos, String)> {
+    ) -> Option<(BytePos, String, Visibility)> {
         find_keyword(blob, keyword, ignore, self).map(|start| {
             let s = match self.search_type {
                 ExactMatch => self.search_str.to_owned(),
@@ -89,15 +89,24 @@ pub fn match_values(src: Src, context: &MatchCxt) -> impl Iterator<Item=Match> {
         .chain(match_fn(&src, context))
 }
 
-fn find_keyword(src: &str, pattern: &str, ignore: &[&str], context: &MatchCxt) -> Option<BytePos> {
+fn find_keyword(
+    src: &str,
+    pattern: &str,
+    ignore: &[&str],
+    context: &MatchCxt
+) -> Option<(BytePos, Option<Visibility>)> {
     find_keyword_impl(
         src,
         pattern,
         context.search_str,
         ignore,
         context.search_type,
-        context.is_local,
+        &context.from_path,
     )
+}
+
+crate fn is_visible(vis: &Visibility, from_path: &core::Path) -> bool {
+    true
 }
 
 fn find_keyword_impl(
@@ -106,12 +115,13 @@ fn find_keyword_impl(
     search_str: &str,
     ignore: &[&str],
     search_type: SearchType,
-    is_local: bool,
+    from_path: &Option<core::Path>,
 ) -> Option<BytePos> {
     let mut start = BytePos::ZERO;
-
-    if let Some(offset) = strip_visivility(&src[..]) {
+    let mut vis = None;
+    if let Some((offset, vis_)) = strip_visivility(&src[..]) {
         start += offset;
+        vis = Some(vis_);
     } else if !is_local {
         // TODO: too about
         return None;
@@ -265,7 +275,7 @@ pub fn match_for(msrc: &str, context: &MatchCxt) -> Vec<Match> {
                 filepath: context.filepath.to_path_buf(),
                 point: start,
                 coords: None,
-                local: context.is_local,
+                visibility: Visibility::Local,
                 mtype: For,
                 contextstr: first_line(blob),
                 generic_args: Vec::new(),
@@ -295,11 +305,12 @@ pub fn get_context(blob: &str, context_end: &str) -> String {
 pub fn match_extern_crate(msrc: &str, context: &MatchCxt, session: &Session) -> Option<Match> {
     let mut res = None;
     let mut blob = &msrc[context.range.to_range()];
-
+    let mut vis = Visibility::Crate;
     // Temporary fix to parse reexported crates by skipping pub
     // keyword until racer understands crate visibility.
-    if let Some(offset) = strip_visivility(blob) {
+    if let Some((offset, visibility)) = strip_visivility(blob) {
         blob = &blob[offset.0..];
+        vis = visibility;
     }
 
     // TODO: later part is really necessary?
@@ -319,15 +330,15 @@ pub fn match_extern_crate(msrc: &str, context: &MatchCxt, session: &Session) -> 
             if let Some(cratepath) = get_crate_file(realname, context.filepath, session) {
                 let crate_src = session.load_file(&cratepath);
                 res = Some(Match { matchstr: name.clone(),
-                                  filepath: cratepath.to_path_buf(),
-                                  point: BytePos::ZERO,
-                                  coords: Some(Coordinate::start()),
-                                  local: false,
-                                  mtype: Module,
-                                  contextstr: cratepath.to_str().unwrap().to_owned(),
-                                  generic_args: Vec::new(),
-                                  generic_types: Vec::new(),
-                                  docs: find_mod_doc(&crate_src, BytePos::ZERO),
+                                   filepath: cratepath.to_path_buf(),
+                                   point: BytePos::ZERO,
+                                   coords: Some(Coordinate::start()),
+                                   visibility: vis,
+                                   mtype: Module,
+                                   contextstr: cratepath.to_str().unwrap().to_owned(),
+                                   generic_args: Vec::new(),
+                                   generic_types: Vec::new(),
+                                   docs: find_mod_doc(&crate_src, BytePos::ZERO),
                 });
             }
         }

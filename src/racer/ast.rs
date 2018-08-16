@@ -450,7 +450,7 @@ fn resolve_ast_path(
                                    core::Namespace::Both, session).nth(0)
 }
 
-fn to_racer_path(path: &ast::Path) -> core::Path {
+crate fn to_racer_path(path: &ast::Path) -> core::Path {
     let mut prefix = None;
     let mut segments = Vec::new();
     for (i, seg) in path.segments.iter().enumerate() {
@@ -458,8 +458,11 @@ fn to_racer_path(path: &ast::Path) -> core::Path {
         let mut types = Vec::new();
         if i == 0 {
             prefix = core::PathPrefix::from_str(&name);
+            if prefix.is_some() {
+                continue;
+            }
         }
-        // TODO: support GenericArgs::Parenthesized (A path like `Foo(A,B) -> C`)
+        // TODO: support GenericArgs::Parenthesized (`Foo(A,B) -> C`)
         if let Some(ref params) = seg.args {
             if let GenericArgs::AngleBracketed(ref angle_args) = **params {
                 angle_args.args.iter().for_each(|arg| {
@@ -620,7 +623,7 @@ impl<'c, 's, 'ast> visit::Visitor<'ast> for ExprTypeVisitor<'c, 's> {
                             &methodname,
                             contextm.point,
                             &contextm.filepath,
-                            contextm.local,
+                            contextm.visibility,
                             core::SearchType::ExactMatch,
                             self.session,
                         );
@@ -861,10 +864,9 @@ fn find_type_match_including_generics(fieldtype: &core::Ty,
     find_type_match(fieldtypepath, filepath, pos, session)
 }
 
-
 struct StructVisitor {
-    pub scope: Scope,
-    pub fields: Vec<(String, BytePos, Option<core::Ty>)>
+    crate scope: Scope,
+    crate fields: Vec<(String, BytePos, Option<core::Ty>, core::Visibility)>,
 }
 
 impl<'ast> visit::Visitor<'ast> for StructVisitor {
@@ -883,8 +885,8 @@ impl<'ast> visit::Visitor<'ast> for StructVisitor {
                 // name unnamed field by its ordinal, since self.0 works
                 None => format!("{}", self.fields.len()),
             };
-
-            self.fields.push((name, point.into(), ty));
+            let vis = core::Visibility::from_ast(&field.vis.node);
+            self.fields.push((name, point.into(), ty, vis));
         }
     }
 }
@@ -1197,7 +1199,7 @@ pub fn parse_pat_bind_stmt(s: String) -> Vec<ByteRange> {
     v.ident_points
 }
 
-pub fn parse_struct_fields(s: String, scope: Scope) -> Vec<(String, BytePos, Option<core::Ty>)> {
+pub fn parse_struct_fields(s: String, scope: Scope) -> Vec<(String, BytePos, Option<core::Ty>, core::Visibility)> {
     let mut v = StructVisitor { scope, fields: Vec::new() };
     with_stmt(s, |stmt| visit::walk_stmt(&mut v, stmt));
     v.fields

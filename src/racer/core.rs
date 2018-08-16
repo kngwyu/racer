@@ -1,5 +1,5 @@
 use rls_span;
-use syntax::codemap;
+use syntax::{ast::VisibilityKind, codemap};
 use std::fs::File;
 use std::io::Read;
 use std::{vec, fmt};
@@ -239,6 +239,51 @@ impl Coordinate {
     }
 }
 
+/// visivility of matched items
+/// See [reference](https://doc.rust-lang.org/reference/visibility-and-privacy.html) for detail.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Visibility {
+    /// public item(pub, macro_export)
+    Public,
+    /// pub(crate), crate
+    Crate,
+    /// pub(in mod), pub(super), etc..
+    Restricted(Box<Path>),
+    /// trait impls
+    Inherited,
+    /// current module (no visibility identifier)
+    Current,
+    /// local variable
+    Local,
+    /// item with no visibility(impl, trait impl, etc..)
+    None,
+}
+
+impl Visibility {
+    crate fn from_ast(vis: &VisibilityKind) -> Self {
+        match vis {
+            VisibilityKind::Public => Visibility::Public,
+            VisibilityKind::Crate(_) => Visibility::Crate,
+            VisibilityKind::Restricted { path, .. } => {
+                let path = ast::to_racer_path(path);
+                Visibility::Restricted(Box::new(path))
+            }
+            VisibilityKind::Inherited => Visibility::Inherited,
+        }
+    }
+    // construct visibility from the string in pub(..)
+    crate fn from_in_paren_str(s: &str) -> Self {
+        let s = s.trim();
+        let path_str = if s.starts_with("in ") {
+            s[2..].trim()
+        } else {
+            s
+        };
+        let path = scopes::construct_path_from_use_tree(s);
+        Visibility::Restricted(Box::new(path))
+    }
+}
+
 /// Context, source, and etc. for detected completion or definition
 #[derive(Clone, PartialEq)]
 pub struct Match {
@@ -246,7 +291,7 @@ pub struct Match {
     pub filepath: path::PathBuf,
     pub point: BytePos,
     pub coords: Option<Coordinate>,
-    pub local: bool,
+    pub visibility: Visibility,
     pub mtype: MatchType,
     pub contextstr: String,
     pub generic_args: Vec<String>,
@@ -325,7 +370,7 @@ impl fmt::Debug for Match {
                self.matchstr,
                self.filepath.display(),
                self.point,
-               self.local,
+               self.visibility,
                self.mtype,
                self.generic_args,
                self.generic_types,
@@ -459,25 +504,23 @@ impl Path {
         Self::from_iter(global, v.into_iter())
     }
 
-    pub fn from_iter(global: bool, i: impl Iterator<Item = String>) -> Path {
+    pub fn from_iter(global: bool, iter: impl Iterator<Item = String>) -> Path {
         let mut prefix = if global {
             Some(PathPrefix::Global)
         } else {
             None
         };
-        let segments: Vec<_> = i
-            .skip_while(|s| {
-                if prefix.is_some() {
-                    return false;
+        let segments: Vec<_> = iter
+            .enumerate()
+            .filter_map(|(i, s)| {
+                if i == 0 && prefix.is_none() {
+                    if let Some(pre) = PathPrefix::from_str(&s) {
+                        prefix = Some(pre);
+                        return None;
+                    }
                 }
-                if let Some(pre) = PathPrefix::from_str(s) {
-                    prefix = Some(pre);
-                    true
-                } else {
-                    false
-                }
+                Some(PathSegment::from(s))
             })
-            .map(PathSegment::from)
             .collect();
         Path { prefix, segments }
     }
@@ -554,7 +597,7 @@ impl fmt::Display for Path {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PathSegment {
     pub name: String,
-    pub types: Vec<Path>
+    pub types: Vec<Path>,
 }
 
 impl PathSegment {
@@ -1257,6 +1300,7 @@ fn complete_from_file_(
                 let path = scopes::construct_path_from_use_tree(&line[use_start.0..]);
                 (path, Namespace::Both)
             } else {
+                // TODO: use scopes::construct_path_from_use_tree
                 let is_global = expr.starts_with("::");
                 let v: Vec<_> = (if is_global {
                     &expr[2..]
