@@ -7,8 +7,8 @@ use std::path::Path;
 use std::rc::Rc;
 
 use syntax::ast::{
-    self, ExprKind, FunctionRetTy, GenericArg, GenericArgs, GenericBound, GenericBounds,
-    GenericParamKind, ItemKind, LitKind, PatKind, TyKind, UseTree, UseTreeKind,
+    self, Expr, ExprKind, FunctionRetTy, GenericArg, GenericArgs, GenericBound, GenericBounds,
+    GenericParamKind, ImplItemKind, ItemKind, LitKind, PatKind, TyKind, UseTree, UseTreeKind,
 };
 use syntax::errors::{emitter::ColorConfig, Handler};
 use syntax::parse::parser::Parser;
@@ -1005,11 +1005,13 @@ impl<'ast> visit::Visitor<'ast> for TraitVisitor {
 pub struct ImplVisitor {
     pub name_path: Option<core::Path>,
     pub trait_path: Option<core::Path>,
+    // TODO(kngwyu): use more explicit types for associated types
+    pub assoc_types: Vec<String>,
 }
 
 impl<'ast> visit::Visitor<'ast> for ImplVisitor {
     fn visit_item(&mut self, item: &ast::Item) {
-        if let ItemKind::Impl(_, _, _, _, ref otrait, ref typ, _) = item.node {
+        if let ItemKind::Impl(_, _, _, _, ref otrait, ref typ, ref items) = item.node {
             match typ.node {
                 TyKind::Path(_, ref path) => {
                     self.name_path = Some(to_racer_path(path));
@@ -1026,6 +1028,11 @@ impl<'ast> visit::Visitor<'ast> for ImplVisitor {
             if let Some(ref t) = otrait {
                 self.trait_path = Some(to_racer_path(&t.path));
             }
+            // for item in items {
+            //     if let ImplItemKind::Type(ref t) = item.node {
+            //         println!("ident: {} ty: {:?}", item.ident, t);
+            //     }
+            // }
         }
     }
 }
@@ -1275,6 +1282,7 @@ pub fn parse_impl(s: String) -> ImplVisitor {
     let mut v = ImplVisitor {
         name_path: None,
         trait_path: None,
+        assoc_types: vec![],
     };
     with_stmt(s, |stmt| visit::walk_stmt(&mut v, stmt));
     v
@@ -1321,6 +1329,7 @@ pub fn parse_generics_and_impl<P: AsRef<Path>>(
     let mut w = ImplVisitor {
         name_path: None,
         trait_path: None,
+        assoc_types: vec![],
     };
     with_stmt(s, |stmt| {
         visit::walk_stmt(&mut v, stmt);
@@ -1560,4 +1569,41 @@ impl<'ast, P: AsRef<Path>> visit::Visitor<'ast> for InheritedTraitsVisitor<P> {
             ));
         }
     }
+}
+
+/// Visitor for for ~ in .. statement
+pub(crate) struct ForStmtVisitor<'r, 's: 'r> {
+    pub(crate) for_ident: Option<Match>,
+    pub(crate) in_expr: Option<Ty>,
+    scope: Scope,
+    session: &'r Session<'s>,
+}
+
+impl<'ast, 'r, 's> visit::Visitor<'ast> for ForStmtVisitor<'r, 's> {
+    fn visit_expr(&mut self, ex: &'ast Expr) {
+        if let ExprKind::ForLoop(ref pat, ref expr, _, _) = ex.node {
+            let mut expr_visitor = ExprTypeVisitor {
+                scope: self.scope.clone(),
+                session: self.session,
+                result: None,
+            };
+            expr_visitor.visit_expr(expr);
+            self.in_expr = expr_visitor.result;
+        }
+    }
+}
+
+pub(crate) fn parse_for_stmt<'r, 's: 'r>(
+    s: String,
+    scope: Scope,
+    session: &'r Session<'s>,
+) -> ForStmtVisitor<'r, 's> {
+    let mut v = ForStmtVisitor {
+        for_ident: None,
+        in_expr: None,
+        scope,
+        session,
+    };
+    with_stmt(s, |stmt| visit::walk_stmt(&mut v, stmt));
+    v
 }

@@ -4,9 +4,9 @@ use ast;
 use core;
 use core::Namespace;
 use core::SearchType::ExactMatch;
-use core::{BytePos, MaskedSource, Match, Scope, Session, SessionExt, Src};
+use core::{BytePos, MaskedSource, Match, MatchType, Scope, Session, SessionExt, Src};
 use matchers;
-use nameres::resolve_path_with_str;
+use nameres;
 use scopes;
 use std::path::Path;
 use util::{self, txt_matches};
@@ -110,7 +110,7 @@ pub fn get_type_of_self(
         if decl.starts_with("impl") {
             let implres = ast::parse_impl(decl);
             debug!("get_type_of_self_arg implres |{:?}|", implres);
-            resolve_path_with_str(
+            nameres::resolve_path_with_str(
                 &implres.name_path.expect("failed parsing impl name"),
                 filepath,
                 start,
@@ -252,6 +252,22 @@ fn get_type_of_let_block_expr(
 
 // TODO: it's inefficient(kngwyu)
 fn get_type_of_for_expr(m: &Match, msrc: Src, session: &Session) -> Option<core::Ty> {
+    if m.mtype != MatchType::For {
+        warn!("[get_type_of_for_expr] invalid match type: {:?}", m.mtype);
+        return None;
+    }
+    let res = ast::parse_for_stmt(m.contextstr.clone(), Scope::from_match(m), session);
+    let in_expr = match res.in_expr? {
+        core::Ty::Match(match_) => match_,
+        _ => return None,
+    };
+    let gen_impl =
+        nameres::search_for_trait_impls(BytePos::ZERO, "IntoIterator", &in_expr, true, session);
+    for m in gen_impl {
+        println!("{} {:?}", m.matchstr, m.mtype);
+    }
+    None
+    /*
     let stmtstart = scopes::expect_stmt_start(msrc, m.point);
     let stmt = msrc.shift_start(stmtstart);
     let forpos = stmt
@@ -297,6 +313,7 @@ fn get_type_of_for_expr(m: &Match, msrc: Src, session: &Session) -> Option<core:
     } else {
         None
     }
+*/
 }
 
 pub fn get_struct_field_type(

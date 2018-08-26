@@ -4370,3 +4370,17 @@ fn follows_rand_crate() {
         assert_eq!(got.matchstr, "gen_range");
     });
 }
+
+#[test]
+fn completes_methods_for_forarg() {
+    let src = "
+    fn main() {
+        let vec2: Vec<Vec<u32>> = vec![];
+        for v in &vec2 {
+            v.append_e~
+        }
+    }
+";
+    let got = get_only_completion(src, None);
+    assert_eq!(got.matchstr, "append_elements");
+}

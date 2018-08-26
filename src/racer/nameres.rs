@@ -329,6 +329,78 @@ fn search_scope_for_static_trait_fns(
     out.into_iter()
 }
 
+// helper function for search_for_impls and search_for_trait_implsearchstr
+// don't use this in other functions
+fn get_impl_start(blob: &str, searchstr: &str) -> Option<usize> {
+    if !blob.starts_with("impl") {
+        return None;
+    }
+    blob.find('{').and_then(|n| {
+        let decl = &blob[..n + 1];
+        if txt_matches(ExactMatch, searchstr, decl) {
+            Some(n)
+        } else {
+            None
+        }
+    })
+}
+
+// search for only trait impls
+pub fn search_for_trait_impls(
+    pos: BytePos,
+    // trait name
+    searchstr: &str,
+    // struct or enum for which we want to find trait impl
+    structmatch: &Match,
+    only_one: bool,
+    session: &Session,
+) -> Vec<Match> {
+    let s = session.load_source_file(&structmatch.filepath);
+    let scope_start = scopes::scope_start(s.as_src(), pos);
+    let src = s.get_src_from_start(scope_start);
+
+    let mut out = Vec::new();
+    for blob_range in src.iter_stmts() {
+        let blob = &src[blob_range.to_range()];
+        if let Some(n) = get_impl_start(blob, searchstr) {
+            let decl = blob[..n + 1].to_owned() + "}";
+            println!("impl decl: {}", decl);
+            if !decl.contains(&structmatch.matchstr) {
+                continue;
+            }
+            let implres = ast::parse_impl(decl);
+            let is_trait_impl = implres.trait_path.is_some();
+            if !is_trait_impl {
+                continue;
+            }
+
+            if let Some(name_path) = implres.name_path {
+                if let Some(name) = name_path.segments.last() {
+                    if symbol_matches(ExactMatch, searchstr, &name.name) {
+                        let m = Match {
+                            matchstr: name.name.clone(),
+                            filepath: structmatch.filepath.clone(),
+                            point: scope_start + blob_range.start + BytePos(5), // 5 = "impl ".len()
+                            coords: None,
+                            local: false,
+                            mtype: MatchType::TraitImpl,
+                            contextstr: "".into(),
+                            generic_args: Vec::new(),
+                            generic_types: Vec::new(),
+                            docs: String::new(),
+                        };
+                        out.push(m);
+                        if only_one {
+                            return out;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
 pub fn search_for_impls(
     pos: BytePos,
     searchstr: &str,
@@ -337,7 +409,7 @@ pub fn search_for_impls(
     include_traits: bool,
     session: &Session,
     import_info: &ImportInfo,
-) -> vec::IntoIter<Match> {
+) -> Vec<Match> {
     debug!(
         "search_for_impls {:?}, {}, {:?}",
         pos,
@@ -351,91 +423,75 @@ pub fn search_for_impls(
     let mut out = Vec::new();
     for blob_range in src.iter_stmts() {
         let blob = &src[blob_range.to_range()];
-        if !blob.starts_with("impl") {
-            continue;
-        }
-        blob.find('{').map(|n| {
-            let decl = &blob[..n + 1];
-            if decl.contains('!') {
-                // Guard against macros
-                debug!(
-                    "impl was probably a macro: {} {:?}",
-                    filepath.display(),
-                    blob_range.start
-                );
-                return;
-            }
-            let mut decl = decl.to_owned();
-            decl.push_str("}");
-            if txt_matches(ExactMatch, searchstr, &decl) {
-                debug!("impl decl {}", decl);
-                let implres = ast::parse_impl(decl);
-                let is_trait_impl = implres.trait_path.is_some();
-                let mtype = if is_trait_impl {
-                    MatchType::TraitImpl
-                } else {
-                    MatchType::Impl
-                };
+        if let Some(n) = get_impl_start(blob, searchstr) {
+            let decl = blob[..n + 1].to_owned() + "}";
+            debug!("impl decl: {}", decl);
+            let implres = ast::parse_impl(decl);
+            let is_trait_impl = implres.trait_path.is_some();
+            let mtype = if is_trait_impl {
+                MatchType::TraitImpl
+            } else {
+                MatchType::Impl
+            };
 
-                if let Some(name_path) = implres.name_path {
-                    if let Some(name) = name_path.segments.last() {
-                        if symbol_matches(ExactMatch, searchstr, &name.name) {
-                            let m = Match {
-                                matchstr: name.name.clone(),
-                                filepath: filepath.to_path_buf(),
-                                point: scope_start + blob_range.start + BytePos(5), // 5 = "impl ".len()
-                                coords: None,
-                                // items in trait impls have no "pub" but are
-                                // still accessible from other modules
-                                local: local || is_trait_impl,
-                                mtype: mtype,
-                                contextstr: "".into(),
-                                generic_args: Vec::new(),
-                                generic_types: Vec::new(),
-                                docs: String::new(),
-                            };
-                            out.push(m);
-                        }
-                    }
-                }
-
-                // find trait
-                if include_traits && is_trait_impl {
-                    let trait_path = implres.trait_path.unwrap();
-                    let m = resolve_path(
-                        &trait_path,
-                        filepath,
-                        scope_start + blob_range.start,
-                        ExactMatch,
-                        Namespace::Type,
-                        session,
-                        import_info,
-                    ).nth(0);
-                    debug!("found trait |{:?}| {:?}", trait_path, m);
-
-                    if let Some(mut m) = m {
-                        if m.matchstr == "Deref" {
-                            let impl_block = &blob[n..];
-
-                            if let Some(pos) = impl_block.find('=') {
-                                let deref_type_start = n + pos + 1;
-
-                                if let Some(pos) = blob[deref_type_start..].find(';') {
-                                    let deref_type_end = deref_type_start + pos;
-                                    let deref_type = blob[deref_type_start..deref_type_end].trim();
-                                    debug!("Deref to {} found", deref_type);
-
-                                    m.generic_args = vec![deref_type.to_owned()];
-                                };
-                            };
-                        }
+            if let Some(name_path) = implres.name_path {
+                if let Some(name) = name_path.segments.last() {
+                    if symbol_matches(ExactMatch, searchstr, &name.name) {
+                        let m = Match {
+                            matchstr: name.name.clone(),
+                            filepath: filepath.to_path_buf(),
+                            point: scope_start + blob_range.start + BytePos(5), // 5 = "impl ".len()
+                            coords: None,
+                            // items in trait impls have no "pub" but are
+                            // still accessible from other modules
+                            local: local || is_trait_impl,
+                            mtype: mtype,
+                            contextstr: "".into(),
+                            generic_args: Vec::new(),
+                            generic_types: Vec::new(),
+                            docs: String::new(),
+                        };
                         out.push(m);
                     }
                 }
             }
-        });
+
+            // find trait
+            if include_traits && is_trait_impl {
+                let trait_path = implres.trait_path.unwrap();
+                let m = resolve_path(
+                    &trait_path,
+                    filepath,
+                    scope_start + blob_range.start,
+                    ExactMatch,
+                    Namespace::Type,
+                    session,
+                    import_info,
+                ).nth(0);
+                debug!("found trait |{:?}| {:?}", trait_path, m);
+
+                if let Some(mut m) = m {
+                    if m.matchstr == "Deref" {
+                        let impl_block = &blob[n..];
+
+                        if let Some(pos) = impl_block.find('=') {
+                            let deref_type_start = n + pos + 1;
+
+                            if let Some(pos) = blob[deref_type_start..].find(';') {
+                                let deref_type_end = deref_type_start + pos;
+                                let deref_type = blob[deref_type_start..deref_type_end].trim();
+                                debug!("Deref to {} found", deref_type);
+
+                                m.generic_args = vec![deref_type.to_owned()];
+                            };
+                        };
+                    }
+                    out.push(m);
+                }
+            }
+        }
     }
-    out.into_iter()
+    out
 }
 
 fn cached_generic_impls(
